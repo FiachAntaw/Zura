@@ -63,3 +63,12 @@ Start sequence Z-Suite emits (M200 Plus): `SetAsValue E0, SetBedTemperature, Set
 1. Which `ConfigurationData` fields the firmware actually uses. We can generate it, but must fill it sensibly (from Z-Suite's default profile for the chosen material).
 2. Remaining PrintMove axis bits (4, 6, 7).
 3. Firmware-side checks at `printFromStorage` (startPrintAdditionalInfo: corrupted file=1, wrong device=2…).
+
+## Printer protocol notes from the first real print (M200 Plus, firmware 2.6.15)
+
+- `printFromStorage` takes the **bare file name** (`"benchy.zcodex2"`), as Z-Suite sends `Path.GetFileName(file)`. With a leading `/` the printer answers `{"status":"3","startPrintAdditionalInfo":1}` ("corrupted file") even for Z-Suite's own files.
+- `wakeUp` closes the connection without a reply; Z-Suite only sends it when `printerStatus` is `sleeping`.
+- `printStatus` answers `{"status":"2"}` while idle, and on this printer also throughout a print. Z-Suite asks for it in its own request, only while printing.
+- `printerStatus` values seen: `idling`, `preparing_for_print`, `heating`, `busy` (homing/calibration), `printing`, `failsafe` (this printer reports failsafe 55/5/5 at the end of every print, a known quirk).
+- `version` replies with typed values: `protocol` 1, `firmware` "2.6.15", `software` 23727, `hardware` 24.
+- FTP `MLSD` works; sizes are strings and `modify` is `YYYYMMDDHHMMSS.mmm`.

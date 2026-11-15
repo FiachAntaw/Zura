@@ -19,8 +19,8 @@ Component
         property var st: device ? device.zortraxStatus : ({})
         property bool reachable: device && device.lastError === ""
         property string state_: (st.printerStatus || "").toLowerCase()
-        property bool printing: state_ === "printing" || state_ === "heating"
-        property bool paused: state_ === "paused" || state_ === "pausing"
+        property bool printing: ["printing", "heating", "busy", "preparing_for_print"].indexOf(state_) >= 0
+        property bool paused: state_ === "printing_paused" || state_ === "paused"
         property real progress: st.job_progress ? parseFloat(st.job_progress) : 0
 
         UM.I18nCatalog { id: catalog; name: "cura" }
@@ -31,9 +31,11 @@ Component
             {
                 case "printing": return catalog.i18nc("@label:status", "Printing")
                 case "heating": return catalog.i18nc("@label:status", "Heating")
-                case "paused": case "pausing": return catalog.i18nc("@label:status", "Paused")
+                case "busy": case "preparing_for_print": case "initializing": return catalog.i18nc("@label:status", "Preparing")
+                case "paused": case "printing_paused": return catalog.i18nc("@label:status", "Paused")
+                case "waiting_for_material_setup": return catalog.i18nc("@label:status", "Waiting for material")
                 case "idle": case "idling": return catalog.i18nc("@label:status", "Idle")
-                case "sleep": return catalog.i18nc("@label:status", "Sleeping")
+                case "sleep": case "sleeping": return catalog.i18nc("@label:status", "Sleeping")
                 case "failsafe": return catalog.i18nc("@label:status", "Needs attention")
                 case "": return catalog.i18nc("@label:status", "Connecting…")
                 default: return s.charAt(0).toUpperCase() + s.slice(1)
@@ -221,7 +223,7 @@ Component
                             width: UM.Theme.getSize("monitor_progress_bar").width
                             value: progress / 100
                         }
-                        UM.Label { text: Math.round(progress) + "%" }
+                        UM.Label { text: Math.round(progress) + "%" + (st.job_estimated ? " " + catalog.i18nc("@label", "(estimated)") : "") }
                     }
 
                     // Controls

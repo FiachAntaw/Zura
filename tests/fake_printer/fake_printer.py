@@ -30,8 +30,8 @@ def handle(storage, cmd):
              "printingInProgress": 1 if STATE["printerStatus"] == "printing" else 0}
         ok["fields"] = [{"name": k, "value": f.get(k, 0)} for k in cmd.get("fields", [])]
     elif t == "printStatus":
-        if STATE["printerStatus"] == "idling":
-            return {"type": t, "status": "2"}  # what the real M200 Plus (firmware 2.6.15) answers when idle
+        if STATE["printerStatus"] == "idling" or os.environ.get("FAKE_NO_PRINTSTATUS"):
+            return {"type": t, "status": "2"}  # firmware 2.6.15 also did this during a whole print  # what the real M200 Plus (firmware 2.6.15) answers when idle
         if STATE["printerStatus"] == "printing":
             STATE["progress"] = min(100, STATE["progress"] + 5)
         f = {"progress": STATE["progress"], "filename": STATE["filename"], "metadata": json.dumps({"PrintTime": 1800}), "userSettings": ""}
@@ -47,7 +47,7 @@ def handle(storage, cmd):
             return {"type": t, "status": "3", "startPrintAdditionalInfo": 1}
         STATE.update(printerStatus="printing", progress=0, filename=os.path.basename(path))
     elif t in ("pause", "resume", "abort"):
-        STATE["printerStatus"] = {"pause": "paused", "resume": "printing", "abort": "idling"}[t]
+        STATE["printerStatus"] = {"pause": "printing_paused", "resume": "printing", "abort": "idling"}[t]
     elif t == "setSetting":
         for s in cmd.get("settings", []):
             STATE[s["name"]] = s["value"]

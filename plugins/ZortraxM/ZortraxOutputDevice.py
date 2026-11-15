@@ -29,11 +29,13 @@ from . import ZCodex2Writer
 catalog = i18nCatalog("cura")
 
 # Zortrax printerStatus -> Cura printer / job state strings
-PRINTER_STATE = {"printing": "printing", "paused": "paused", "pausing": "paused", "idle": "idle", "idling": "idle",
-                 "heating": "pre_print", "failsafe": "error", "sleep": "idle", "sleeping": "idle", "aborting": "printing",
-                 "finished": "idle", "maintenance": "maintenance"}
-JOB_STATE = {"printing": "printing", "heating": "pre_print", "paused": "paused", "pausing": "pausing",
-             "aborting": "aborting", "finished": "finished"}
+# Zortrax printerStatus (Z-Suite's PrinterStatus enum, plus "heating" seen on firmware 2.6.15) -> Cura states
+PRINTER_STATE = {"idling": "idle", "sleeping": "idle", "uninitialized": "idle", "initializing": "pre_print",
+                 "printing": "printing", "printing_paused": "paused", "busy": "pre_print",
+                 "preparing_for_print": "pre_print", "heating": "pre_print", "failsafe": "error",
+                 "unresponsive": "error", "blackout": "error", "waiting_for_material_setup": "maintenance"}
+JOB_STATE = {"printing": "printing", "printing_paused": "paused", "busy": "pre_print",
+             "preparing_for_print": "pre_print", "heating": "pre_print"}
 
 
 class ZortraxController(PrinterOutputController):
@@ -74,6 +76,7 @@ class ZortraxOutputDevice(PrinterOutputDevice):
         self._camera_enabled = True
         self._last_error = ""
         self._uploading = False
+        self._last_sent = None  # {"name", "print_time", "started"} of the file this device last started
         self._loaded_material = ""
         self._files: list = []
         self._files_loading = False
@@ -163,13 +166,26 @@ class ZortraxOutputDevice(PrinterOutputDevice):
                 printer.updateActivePrintJob(pj)
             pj.updateState(JOB_STATE.get(state, "printing"))
             progress = self._progress(job)
-            if progress is not None:
-                total = self._estimated_seconds(job)
-                if total:
-                    pj.updateTimeTotal(total)
-                    pj.updateTimeElapsed(int(total * progress / 100))
+            total = self._estimated_seconds(job)
+            sent = self._last_sent
+            if progress is None and sent and name in ("print", sent["name"]) and sent["print_time"]:
+                # The printer doesn't always answer printStatus; estimate from the slicer's time instead.
+                if state == "printing" and sent["started"] is None:
+                    sent["started"] = time.time()
+                if sent["started"] is not None:
+                    total = sent["print_time"]
+                    progress = min(99.0, (time.time() - sent["started"]) * 100.0 / total)
+                    self._status["job_progress"] = round(progress, 1)
+                    self._status["job_estimated"] = True
+                if name == "print":
+                    self._status["job_filename"] = sent["name"]
+            if progress is not None and total:
+                pj.updateTimeTotal(total)
+                pj.updateTimeElapsed(int(total * progress / 100))
         else:
             printer.updateActivePrintJob(None)
+            if self._last_sent and self._last_sent["started"] is not None:
+                self._last_sent = None  # that print has ended
         if camera:
             image = QImage.fromData(base64.b64decode(camera["data"]))
             if not image.isNull():
@@ -384,6 +400,8 @@ class ZortraxOutputDevice(PrinterOutputDevice):
         safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", job_name)[:40] or "cura"
         remote = "/{0}_{1}.zcodex2".format(safe, time.strftime("%Y%m%d-%H%M%S"))
         self._uploading = True
+        self._last_sent = {"name": remote.lstrip("/"), "print_time": _header_print_time(buffer.getvalue()),
+                           "started": None}
         message = Message(catalog.i18nc("@info:status", "Sending {0} to the printer").format(remote.lstrip("/")),
                           title="Zortrax", progress=0, dismissable=False, lifetime=0)
         message.show()
@@ -418,6 +436,15 @@ class ZortraxOutputDevice(PrinterOutputDevice):
                     message_type=Message.MessageType.POSITIVE).show()
             self._update()
             self.refreshFiles()
+
+
+def _header_print_time(data: bytes) -> int:
+    """The slicer's print time (s) from a .zcodex2 header, or 0."""
+    try:
+        n = int.from_bytes(data[:4], "little")
+        return int(json.loads(data[4:4 + n]).get("PrintTime") or 0)
+    except (ValueError, TypeError, AttributeError):
+        return 0
 
 
 def _print_files(entries) -> list:

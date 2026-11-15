@@ -21,6 +21,7 @@ STATUS_FIELDS = ('hotendTemperature', 'heatbedTemperature', 'printerStatus',
     'storageBytesFree', 'storageBytesTotal', 'currentMaterial', 'serialNumber',
     'failsafeReason', 'currentPrinterSystemTime', 'currentMaterialId', 'materialLeft',
     'currentSecondMaterialId', 'printingInProgress', 'failsafeAlertSource', 'failsafeAlertReason')
+PRINT_STATUS_FIELDS = ('progress', 'metadata', 'userSettings', 'filename')
 SETTINGS = ('lights', 'buzzer', 'sleep', 'nozzleDiameter')
 CONTROL_ACTIONS = ('pause', 'resume', 'abort', 'restart', 'wakeUp')
 COMMANDS = CONTROL_ACTIONS + ('status', 'printStatus', 'version', 'getCameraPreview',
@@ -109,9 +110,20 @@ class PrinterClient:
         return responses
 
     def status(self):
-        return self.request([{'type': 'status', 'fields': list(STATUS_FIELDS)},
-            {'type': 'printStatus', 'fields': ['progress', 'metadata', 'userSettings', 'filename']}],
-            optional=('printStatus',))  # an idle printer answers printStatus with status 2
+        """[status, printStatus]. Like Z-Suite, ask for printStatus in its own request and only while a
+        print is running; otherwise the second entry is an empty status-2 reply."""
+        status = self.request([{'type': 'status', 'fields': list(STATUS_FIELDS)}])[0]
+        info = fields(status)
+        running = str(info.get('printerStatus', '')) in ('printing', 'printing_paused') or \
+            str(info.get('printingInProgress', '0')) == '1'
+        job = {'type': 'printStatus', 'status': '2'}
+        if running:
+            try:
+                job = self.request([{'type': 'printStatus', 'fields': list(PRINT_STATUS_FIELDS)}],
+                                   optional=('printStatus',))[0]
+            except PrinterError:
+                pass
+        return [status, job]
 
     def full_info(self):
         return self.request([{'type': 'status', 'fields': list(STATUS_FIELDS)},
