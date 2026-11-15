@@ -34,6 +34,9 @@ def handle(storage, cmd):
             STATE["progress"] = min(100, STATE["progress"] + 5)
         f = {"progress": STATE["progress"], "filename": STATE["filename"], "metadata": json.dumps({"PrintTime": 1800}), "userSettings": ""}
         ok["fields"] = [{"name": k, "value": f.get(k)} for k in cmd.get("fields", [])]
+    elif t == "version":
+        f = {"protocol": "1", "firmware": "2.6.3", "software": "1.0", "hardware": "24"}
+        ok["fields"] = [{"name": k, "value": f.get(k)} for k in cmd.get("fields", [])]
     elif t == "getCameraPreview":
         ok["cameraPreviewData"] = base64.b64encode(open(CAMERA_FILE, "rb").read() if CAMERA_FILE else JPEG).decode()
     elif t == "printFromStorage":

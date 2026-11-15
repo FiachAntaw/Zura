@@ -294,7 +294,7 @@ def main():
         name, layer_id, quality = p["material"], p["layer_id"], p["quality"]
         layer_mm = int(layer_id) / 100.0
         qt = quality_type(layer_id, quality)
-        label = QUALITY_NAMES[layer_id] + ("" if quality == "High" else " Draft")
+        label = quality  # Cura appends the layer height, e.g. "High - 0.2mm"
         qtypes[qt] = (label, -int(layer_id) - (0 if quality == "High" else 1))
         names[material_id(name)] = name
         table[(material_id(name), qt)] = cura_values(prof["configuration"], prof["settings"], layer_mm)

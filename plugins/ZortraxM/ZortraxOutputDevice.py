@@ -16,12 +16,14 @@ from UM.PluginRegistry import PluginRegistry
 from UM.i18n import i18nCatalog
 
 from cura.CuraApplication import CuraApplication
+from cura.PrinterOutput.Models.MaterialOutputModel import MaterialOutputModel
 from cura.PrinterOutput.Models.PrintJobOutputModel import PrintJobOutputModel
 from cura.PrinterOutput.Models.PrinterOutputModel import PrinterOutputModel
 from cura.PrinterOutput.PrinterOutputController import PrinterOutputController
 from cura.PrinterOutput.PrinterOutputDevice import ConnectionState, ConnectionType, PrinterOutputDevice
 
 from .lan import client as lan
+from .models import name_for_definition
 from . import ZCodex2Writer
 
 catalog = i18nCatalog("cura")
@@ -54,11 +56,14 @@ class ZortraxOutputDevice(PrinterOutputDevice):
     cameraChanged = pyqtSignal()
     statusChanged = pyqtSignal()
 
-    def __init__(self, host: str, serial: str = "", parent: QObject = None) -> None:
+    def __init__(self, host: str, serial: str = "", definition_id: str = "zortrax_m200_plus",
+                 firmware: str = "", parent: QObject = None) -> None:
         super().__init__(device_id="zortrax-" + host, connection_type=ConnectionType.NetworkConnection, parent=parent)
         self._host = host
         self._address = host
         self._serial = serial
+        self._definition_id = definition_id
+        self._firmware = firmware
         self._client = lan.PrinterClient(host, timeout=10)
         self._lock = threading.Lock()
         self._busy = False
@@ -68,7 +73,9 @@ class ZortraxOutputDevice(PrinterOutputDevice):
         self._camera_enabled = True
         self._last_error = ""
         self._uploading = False
-        self.setName("Zortrax " + (serial or host))
+        self._loaded_material = ""
+        self._model_name = name_for_definition(definition_id)
+        self.setName(self._model_name + (" (" + serial + ")" if serial else ""))
         self.setShortDescription(catalog.i18nc("@action:button", "Print over network"))
         self.setDescription(catalog.i18nc("@properties:tooltip", "Send to the Zortrax printer at {0}").format(host))
         self.setIconName("print")
@@ -77,7 +84,7 @@ class ZortraxOutputDevice(PrinterOutputDevice):
         self._update_timer.setInterval(3000)
         printer = PrinterOutputModel(output_controller=ZortraxController(self), number_of_extruders=1)
         printer.updateName(self.getName())
-        printer.updateType("Zortrax M200 Plus")
+        printer.updateType(self._model_name)
         self._printers = [printer]
         self._setAcceptsCommands(True)
 
@@ -117,10 +124,11 @@ class ZortraxOutputDevice(PrinterOutputDevice):
         self.setConnectionState(ConnectionState.Connected)
         printer = self._printers[0]
         serial = status.get("serialNumber")
-        if serial and printer.name != "Zortrax " + str(serial):
-            printer.updateName("Zortrax " + str(serial))
+        if serial and printer.name != "{0} ({1})".format(self._model_name, serial):
+            printer.updateName("{0} ({1})".format(self._model_name, serial))
         state = str(status.get("printerStatus", "")).lower()
         printer.updateState(PRINTER_STATE.get(state, "idle"))
+        self._syncLoadedMaterial(str(status.get("currentMaterial") or ""))
         try:
             printer.extruders[0].updateHotendTemperature(float(status.get("hotendTemperature", 0)))
             printer.updateBedTemperature(float(status.get("heatbedTemperature", 0)))
@@ -150,6 +158,24 @@ class ZortraxOutputDevice(PrinterOutputDevice):
                 self._camera_url = "image://zortraxcam/{0}?{1}".format(self._host, self._camera_counter)
                 self.cameraChanged.emit()
         self.statusChanged.emit()
+
+    def _syncLoadedMaterial(self, name: str) -> None:
+        """Show the filament the printer reports as loaded on Cura's printer model."""
+        if name == self._loaded_material:
+            return
+        self._loaded_material = name
+        extruder = self._printers[0].extruders[0]
+        if not name:
+            extruder.updateActiveMaterial(None)
+            return
+        meta = _zortrax_material(name)
+        extruder.updateActiveMaterial(MaterialOutputModel(
+            guid=meta.get("GUID") if meta else None, type=meta.get("material", "") if meta else "",
+            color=meta.get("color_code", "#ffffff") if meta else "#ffffff", brand="Zortrax", name=name))
+
+    @pyqtProperty(str, notify=statusChanged)
+    def loadedMaterial(self) -> str:
+        return self._loaded_material
 
     @staticmethod
     def _progress(job: dict) -> Optional[float]:
@@ -190,6 +216,28 @@ class ZortraxOutputDevice(PrinterOutputDevice):
     def host(self) -> str:
         return self._host
 
+    @pyqtProperty(str, constant=True)
+    def name(self) -> str:
+        """Cura's "Add printer" list reads device.name."""
+        return self.getName()
+
+    @property
+    def address(self) -> str:
+        return self._host
+
+    @property
+    def serial(self) -> str:
+        return self._serial
+
+    @property
+    def definitionId(self) -> str:
+        return self._definition_id
+
+    @pyqtSlot(str, result=str)
+    def getProperty(self, key: str) -> str:
+        """Used by Cura's "Add printer by IP" page."""
+        return {"firmware_version": self._firmware, "serial": self._serial, "address": self._host}.get(key, "")
+
     # ------------------------------------------------------------------ controls
     @pyqtSlot(str)
     def sendControl(self, action: str) -> None:
@@ -220,6 +268,33 @@ class ZortraxOutputDevice(PrinterOutputDevice):
         if self._uploading:
             Message(catalog.i18nc("@info", "A file is already being sent to this printer."), title="Zortrax").show()
             return
+        sliced_for = _active_material_name()
+        if self._loaded_material and sliced_for and _norm(sliced_for) != _norm(self._loaded_material):
+            self._confirmMismatch(nodes, sliced_for)
+            return
+        self._sendNodes(nodes)
+
+    def _confirmMismatch(self, nodes, sliced_for: str) -> None:
+        message = Message(
+            catalog.i18nc("@info", "This print was prepared for {0}, but the printer has {1} loaded. The printer may refuse it or print with the wrong settings.")
+            .format(sliced_for, self._loaded_material),
+            title=catalog.i18nc("@info:title", "Different material loaded"), lifetime=0,
+            message_type=Message.MessageType.WARNING)
+        message.addAction("send", catalog.i18nc("@action:button", "Print anyway"), "", "")
+        message.addAction("cancel", catalog.i18nc("@action:button", "Cancel"), "", "",
+                          button_style=Message.ActionButtonStyle.SECONDARY)
+        self._pending_nodes = nodes
+        message.actionTriggered.connect(self._onMismatchAction)
+        self._mismatch_message = message
+        message.show()
+
+    def _onMismatchAction(self, message, action: str) -> None:
+        message.hide()
+        nodes, self._pending_nodes = getattr(self, "_pending_nodes", None), None
+        if action == "send" and nodes is not None:
+            self._sendNodes(nodes)
+
+    def _sendNodes(self, nodes) -> None:
         writer = ZCodex2Writer.ZCodex2Writer()
         buffer = _BytesSink()
         if not writer.write(buffer, nodes):
@@ -265,6 +340,27 @@ class ZortraxOutputDevice(PrinterOutputDevice):
             Message(catalog.i18nc("@info", "Print started on the Zortrax printer."), title="Zortrax",
                     message_type=Message.MessageType.POSITIVE).show()
             self._update()
+
+
+def _norm(name: str) -> str:
+    return "".join(ch for ch in name.lower() if ch.isalnum())
+
+
+def _active_material_name() -> str:
+    stack = CuraApplication.getInstance().getGlobalContainerStack()
+    if stack is None or not stack.extruderList:
+        return ""
+    material = stack.extruderList[0].material
+    return material.getMetaDataEntry("color_name") or material.getName() if material else ""
+
+
+def _zortrax_material(name: str) -> Optional[dict]:
+    """Metadata of the Zortrax material file whose name matches the printer's material name."""
+    registry = CuraApplication.getInstance().getContainerRegistry()
+    for meta in registry.findInstanceContainersMetadata(type="material", brand="Zortrax"):
+        if _norm(meta.get("name", "")) == _norm(name) and meta.get("id") == meta.get("base_file"):
+            return meta
+    return None
 
 
 class _BytesSink:

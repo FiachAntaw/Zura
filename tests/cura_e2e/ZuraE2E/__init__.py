@@ -44,10 +44,96 @@ class E2E(Extension):
             win.setWidth(1500); win.setHeight(950)
         except Exception as e:
             log(f"welcome/resize: {e}")
+        if os.environ.get("ZURA_E2E_ADD"):
+            QTimer.singleShot(6000, self.step_add)
+            return
         if os.environ.get("ZURA_E2E_DUMP"):
             QTimer.singleShot(3000, self.step_dump)
             return
         QTimer.singleShot(3000, self.step_info)
+
+    @guard
+    def step_add(self):
+        """Cura's Add printer flow: the fake printer must appear as a networked printer and be addable."""
+        app = CuraApplication.getInstance()
+        model = app.getDiscoveredPrintersModel()
+        listed = {a: (p.name, p.machineType, p.readableMachineType) for a, p in model.discoveredPrintersByAddress.items()}
+        log(f"discovered: {listed}")
+        model.checkManualDevice(os.environ.get("ZURA_E2E_MANUAL", "127.0.0.2"))
+        if os.environ.get("ZURA_E2E_SHOTS"):
+            from PyQt6.QtQml import QQmlComponent
+            comp = QQmlComponent(app._qml_engine)
+            comp.setData(b"import QtQuick 2.15; import Cura 1.1 as Cura; Item { Component.onCompleted: Cura.Actions.addMachine.trigger() }", QUrl())
+            self._trigger = comp.create()
+            self._addwin = self._trigger
+            if self._addwin is None:
+                log("add dialog qml errors: " + "; ".join(e.toString() for e in comp.errors()))
+        QTimer.singleShot(4000, self.step_add_nav)
+        QTimer.singleShot(7000, self.step_add2)
+
+    @guard
+    def step_add_nav(self):
+        """Click "Non UltiMaker printer" so the networked printer list shows."""
+        from PyQt6.QtGui import QGuiApplication
+        from PyQt6.QtCore import QMetaObject, QObject
+        app = CuraApplication.getInstance()
+        for w in QGuiApplication.topLevelWindows():
+            if w.isVisible() and w.title() == "Add Printer":
+                stack = [w.contentItem()]
+                while stack:
+                    o = stack.pop()
+                    stack.extend(o.childItems())
+                    if o.metaObject().className().startswith("AddUltimakerOrThirdPartyPrinterStack"):
+                        for c in o.findChildren(QObject):
+                            if "StackLayout" in c.metaObject().className():
+                                c.setProperty("currentIndex", 2)
+                                log("switched to non-UM printer page")
+                                return
+        info = []
+        for w in QGuiApplication.topLevelWindows():
+            n, texts = 0, []
+            if hasattr(w, "contentItem"):
+                stack = [w.contentItem()]
+                while stack:
+                    o = stack.pop(); n += 1
+                    stack.extend(o.childItems())
+                    t = o.property("text")
+                    if isinstance(t, str) and "rinter" in t:
+                        texts.append((t, type(o).__name__, o.metaObject().className()))
+            info.append((w.title(), w.isVisible(), n, texts[:6]))
+        log(f"non-UM button not found: {info}")
+
+    @guard
+    def step_add2(self):
+        app = CuraApplication.getInstance()
+        model = app.getDiscoveredPrintersModel()
+        listed = {a: (p.name, p.machineType) for a, p in model.discoveredPrintersByAddress.items()}
+        log(f"after manual add: {listed}")
+        if os.environ.get("ZURA_E2E_SHOTS"):
+            from PyQt6.QtGui import QGuiApplication
+            wins = [w for w in QGuiApplication.topLevelWindows() if w.isVisible() and w is not app.getMainWindow()]
+            log("windows: " + ", ".join(f"{w.title()!r} {w.width()}x{w.height()}" for w in wins))
+            for w in wins:
+                if hasattr(w, "grabWindow"):
+                    w.grabWindow().save(os.path.join(os.environ["ZURA_E2E_SHOTS"], "add-printer.png"))
+                    log("add printer shot saved")
+                    w.close()
+                    break
+        printer = next((p for a, p in model.discoveredPrintersByAddress.items() if a != os.environ.get("ZURA_E2E_MANUAL", "127.0.0.2")), None)
+        self._added = printer.address if printer else None
+        if printer:
+            model.createMachineFromDiscoveredPrinter(printer)
+        QTimer.singleShot(6000, self.step_add3)
+
+    @guard
+    def step_add3(self):
+        app = CuraApplication.getInstance()
+        stack = app.getGlobalContainerStack()
+        dev = app.getOutputDeviceManager().getOutputDevice(f"zortrax-{self._added}")
+        log(f"active machine={stack.getName()} definition={stack.definition.getId()} host={stack.getMetaDataEntry('zortrax_host')} "
+            f"device={dev is not None} state={dev.connectionState if dev else None} printer={dev.activePrinter.name if dev and dev.activePrinter else None}")
+        log("done")
+        QTimer.singleShot(500, app.closeApplication)
 
     @guard
     def step_dump(self):
@@ -88,7 +174,18 @@ class E2E(Extension):
                         "material_ids": sorted({m.get("base_file", m["id"]) for m in mats})[:40]}))
         qm = app.getMachineManager().activeQualityGroups() if hasattr(app.getMachineManager(), "activeQualityGroups") else None
         app.readLocalFile(QUrl.fromLocalFile(STL))
+        if os.environ.get("ZURA_E2E_PLATE"):
+            QTimer.singleShot(6000, self.step_plate)
+            return
         QTimer.singleShot(5000, self.step_slice)
+
+    @guard
+    def step_plate(self):
+        app = CuraApplication.getInstance()
+        for m in list(app.getVisibleMessages()):
+            m.hide()
+        QTimer.singleShot(1500, lambda: (app.getMainWindow().grabWindow().save(os.environ["ZURA_E2E_PLATE"]),
+                                         log("plate shot saved"), app.closeApplication()))
 
     @guard
     def step_slice(self):
@@ -134,6 +231,22 @@ class E2E(Extension):
         log(f"device={dev is not None} state={dev.connectionState if dev else None} status={dict(dev.zortraxStatus) if dev else None} camera={dev.cameraUrl if dev else None} err={dev.lastError if dev else None}")
         item = dev.monitorItem
         log(f"monitor item created={item is not None}")
+        p = dev.activePrinter
+        mat = p.extruders[0].activeMaterial
+        log(f"loaded material: device={dev.loadedMaterial} model={(mat.name, mat.brand, mat.guid, mat.color) if mat else None}")
+        if os.environ.get("ZURA_E2E_MISMATCH"):
+            app.getMachineManager().setMaterialById("0", "zortrax_z_pla")
+            dev.requestWrite(app.getController().getScene().getRoot().getChildren())
+            warn = [m for m in app.getVisibleMessages() if "material" in (m.getTitle() or "").lower()]
+            log(f"mismatch warning: {[(m.getTitle(), m.getText(), [a['name'] for a in m.getActions()]) for m in warn]}")
+            if warn:
+                if os.environ.get("ZURA_E2E_SHOTS"):
+                    app.getMainWindow().grabWindow().save(os.path.join(os.environ["ZURA_E2E_SHOTS"], "mismatch.png"))
+                warn[0].actionTriggered.emit(warn[0], "cancel")
+                log(f"after cancel: uploading={dev._uploading}")
+            log("done")
+            QTimer.singleShot(500, app.closeApplication)
+            return
         dev.requestWrite(app.getController().getScene().getRoot().getChildren())
         if os.environ.get("ZURA_E2E_SHOTS"):
             QTimer.singleShot(9000, self.step_shots)

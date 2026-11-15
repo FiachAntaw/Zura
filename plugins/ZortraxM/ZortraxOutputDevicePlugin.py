@@ -4,12 +4,16 @@ import threading
 from PyQt6.QtCore import QTimer
 
 from UM.Logger import Logger
+from UM.OutputDevice.OutputDeviceManager import ManualDeviceAdditionAttempt
 from UM.OutputDevice.OutputDevicePlugin import OutputDevicePlugin
 from UM.Signal import Signal
 
 from cura.CuraApplication import CuraApplication
 
+from cura.Settings.CuraStackBuilder import CuraStackBuilder
+
 from .lan import client as lan
+from .models import model_for_hardware
 from .ZortraxOutputDevice import ZortraxCameraProvider, ZortraxOutputDevice
 
 HOST_KEY = "zortrax_host"
@@ -23,6 +27,10 @@ class ZortraxOutputDevicePlugin(OutputDevicePlugin):
         self._discovered = []  # [{host, hardware, serialNumber}]
         self._device = None
         self._provider_registered = False
+        self._listed = {}  # host -> ZortraxOutputDevice shown in Cura's "Add printer" list
+        self._refresh = QTimer()
+        self._refresh.setInterval(15000)
+        self._refresh.timeout.connect(self.startDiscovery)
         app = CuraApplication.getInstance()
         app.globalContainerStackChanged.connect(self._onStackChanged)
         app.engineCreatedSignal.connect(self._onEngineCreated)
@@ -35,9 +43,11 @@ class ZortraxOutputDevicePlugin(OutputDevicePlugin):
 
     def start(self) -> None:
         self.startDiscovery()
+        self._refresh.start()
         self._onStackChanged()
 
     def stop(self) -> None:
+        self._refresh.stop()
         self._removeDevice()
 
     # ---------------------------------------------------------------- discovery
@@ -54,7 +64,88 @@ class ZortraxOutputDevicePlugin(OutputDevicePlugin):
 
     def _setDiscovered(self, found) -> None:
         self._discovered = found
+        self._syncAddPrinterList(found)
         self.discoveredDevicesChanged.emit()
+
+    # ---------------------------------------------------------------- Cura "Add printer" integration
+    def _syncAddPrinterList(self, found) -> None:
+        model = CuraApplication.getInstance().getDiscoveredPrintersModel()
+        registry = CuraApplication.getInstance().getContainerRegistry()
+        seen = set()
+        for p in found:
+            m = model_for_hardware(p.get("hardware"))
+            if m is None or not registry.findDefinitionContainersMetadata(id=m[0]):
+                continue
+            self._listPrinter(p["host"], p.get("serialNumber", ""), m[0])
+            seen.add(p["host"])
+        for host in list(self._listed):
+            if host not in seen and not getattr(self._listed[host], "_manual", False):
+                self._listed.pop(host)
+                model.removeDiscoveredPrinter(host)
+
+    def _listPrinter(self, host: str, serial: str, definition_id: str, firmware: str = "", manual: bool = False) -> None:
+        model = CuraApplication.getInstance().getDiscoveredPrintersModel()
+        device = self._listed.get(host)
+        if device and device.serial == serial and device.definitionId == definition_id:
+            return
+        if not manual and any(d.serial == serial and h != host and getattr(d, "_manual", False)
+                              for h, d in self._listed.items()):
+            return  # the user added this printer by IP; keep that entry
+        if device:
+            model.removeDiscoveredPrinter(host)
+        for other_host, other in list(self._listed.items()):  # same printer found under another address
+            if serial and other_host != host and other.serial == serial:
+                self._listed.pop(other_host)
+                model.removeDiscoveredPrinter(other_host)
+        device = ZortraxOutputDevice(host, serial, definition_id, firmware)
+        device._manual = manual
+        self._listed[host] = device
+        model.addDiscoveredPrinter(ip_address=host, key=device.getId(), name=device.getName(),
+                                   create_callback=self._createMachine, machine_type=definition_id, device=device)
+
+    def _createMachine(self, key: str) -> None:
+        device = next((d for d in self._listed.values() if d.getId() == key), None)
+        if device is None:
+            return
+        machine = CuraStackBuilder.createMachine(device.getName(), device.definitionId)
+        if not machine:
+            Logger.log("e", "Could not create a machine for Zortrax printer %s", device.address)
+            return
+        machine.setMetaDataEntry(HOST_KEY, device.address)
+        CuraApplication.getInstance().getMachineManager().setActiveMachine(machine.getId())
+
+    def canAddManualDevice(self, address: str = "") -> ManualDeviceAdditionAttempt:
+        return ManualDeviceAdditionAttempt.POSSIBLE
+
+    def addManualDevice(self, address: str, callback=None) -> None:
+        def probe():
+            ok, info = False, None
+            try:
+                client = lan.PrinterClient(address, timeout=5)
+                serial = str(lan.fields(client.request([{"type": "status", "fields": ["serialNumber"]}])[0])
+                             .get("serialNumber") or "")
+                try:
+                    version = lan.fields(client.request([{"type": "version", "fields": ["firmware", "hardware"]}])[0])
+                except lan.PrinterError:
+                    version = {}
+                m = model_for_hardware(version.get("hardware"))
+                info = (serial, m[0] if m else "zortrax_m200_plus", str(version.get("firmware") or ""))
+                ok = True
+            except Exception as e:
+                Logger.log("i", "No Zortrax printer at %s: %s", address, e)
+            CuraApplication.getInstance().callLater(done, ok, info)
+
+        def done(ok, info):
+            if ok:
+                self._listPrinter(address, info[0], info[1], info[2], manual=True)
+            if callback:
+                callback(ok, address)
+        threading.Thread(target=probe, daemon=True).start()
+
+    def removeManualDevice(self, key: str, address=None) -> None:
+        if address and address in self._listed and getattr(self._listed[address], "_manual", False):
+            self._listed.pop(address)
+            CuraApplication.getInstance().getDiscoveredPrintersModel().removeDiscoveredPrinter(address)
 
     def getDiscovered(self):
         return list(self._discovered)
@@ -82,7 +173,7 @@ class ZortraxOutputDevicePlugin(OutputDevicePlugin):
         if not host:
             return
         try:
-            self._device = ZortraxOutputDevice(host)
+            self._device = ZortraxOutputDevice(host, definition_id=stack.definition.getId())
         except ValueError:
             Logger.log("w", "Invalid Zortrax printer address %s", host)
             return
