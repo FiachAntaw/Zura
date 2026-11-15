@@ -64,7 +64,8 @@ class PrinterClient:
         self.ftp_username, self.ftp_password = ftp_username, ftp_password
         self.max_response_bytes = max_response_bytes
 
-    def request(self, commands: list[dict]) -> list[dict]:
+    def request(self, commands: list[dict], optional: tuple = ()) -> list[dict]:
+        """Send a batch. Replies for command types in `optional` may carry status 2 (nothing to report)."""
         if not isinstance(commands, list) or not commands:
             raise ValueError('At least one command is required')
         if any(not isinstance(c, dict) or c.get('type') not in COMMANDS for c in commands):
@@ -103,19 +104,21 @@ class PrinterClient:
         for command, item in zip(commands, responses):
             if not isinstance(item, dict) or item.get('type') != command['type']:
                 raise PrinterError('Printer response command does not match request')
-            if _status_code(item) != 1:
+            if _status_code(item) != 1 and not (command['type'] in optional and _status_code(item) == 2):
                 raise PrinterError(f"Printer rejected {command['type']}: {json.dumps(item)}")
         return responses
 
     def status(self):
         return self.request([{'type': 'status', 'fields': list(STATUS_FIELDS)},
-            {'type': 'printStatus', 'fields': ['progress', 'metadata', 'userSettings', 'filename']}])
+            {'type': 'printStatus', 'fields': ['progress', 'metadata', 'userSettings', 'filename']}],
+            optional=('printStatus',))  # an idle printer answers printStatus with status 2
 
     def full_info(self):
         return self.request([{'type': 'status', 'fields': list(STATUS_FIELDS)},
             {'type': 'version', 'fields': ['protocol', 'firmware', 'software', 'hardware']},
             {'type': 'getSetting', 'fields': list(SETTINGS)},
-            {'type': 'printStatus', 'fields': ['progress', 'metadata', 'userSettings', 'filename']}])
+            {'type': 'printStatus', 'fields': ['progress', 'metadata', 'userSettings', 'filename']}],
+            optional=('printStatus',))
 
     def camera(self, quality=50):
         if type(quality) is not int or not 1 <= quality <= 100:
@@ -177,7 +180,9 @@ class PrinterClient:
     def print_file(self, path, forced=False):
         if type(forced) is not bool:
             raise ValueError('forced must be boolean')
-        return self.request([{'type': 'printFromStorage', 'path': remote_path(path), 'forced': forced}])[0]
+        # Z-Suite sends the bare file name (Path.GetFileName); with a leading '/' the firmware answers
+        # startPrintAdditionalInfo 1 ("corrupted file") even for its own files.
+        return self.request([{'type': 'printFromStorage', 'path': remote_path(path).lstrip('/'), 'forced': forced}])[0]
 
     def update_firmware(self, path):
         return self.request([{'type': 'updateFromStorage', 'path': remote_path(path)}])[0]

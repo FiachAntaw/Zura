@@ -92,6 +92,7 @@ class Translator:
         self.pauses: List[dict] = []
         self.elapsed_s = 0.0
         self.encoders_on = False
+        self.layer_frames: List[tuple] = []   # (index in out, Cura layer number)
         self.old_z = 0.0
         self.extruder_reselected = False
 
@@ -178,6 +179,7 @@ class Translator:
             self.layers_seen.add(n)
             if first_of_layer:
                 self._layer_preamble(n)
+            self.layer_frames.append((len(self.out), n))
             self.emit(C.layer(n))
             if self.pause_pending:
                 self.pause_pending = False
@@ -315,8 +317,21 @@ class Translator:
         if "E" in w:
             self.e_abs = self.e_abs + w["E"] if self.relative_e else w["E"]
 
+    def _renumber_layers(self) -> None:
+        """Cura numbers raft layers -N-1..-2 and skips -1; the printer wants consecutive layer numbers
+        (Z-Suite's raft layers run up to -1), so close the gap below layer 0."""
+        negatives = sorted({n for _, n in self.layer_frames if n < 0})
+        mapping = {n: i - len(negatives) for i, n in enumerate(negatives)}
+        if all(k == v for k, v in mapping.items()):
+            return
+        for idx, n in self.layer_frames:
+            if n in mapping:
+                self.out[idx] = C.layer(mapping[n])
+        self.layers_seen = {mapping.get(n, n) for n in self.layers_seen}
+
     def finish(self) -> Result:
         self._start()
+        self._renumber_layers()
         lift = min(self.o.max_z_mm, self.z + self.o.end_lift_mm)
         self.emit(C.set_feedrate(4800))
         self.emit(C.print_move(T.JUMP, z=um(lift)))

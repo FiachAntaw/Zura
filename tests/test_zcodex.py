@@ -66,7 +66,10 @@ class TranslatorTests(unittest.TestCase):
         self.assertIn(C.Op.LAYER, ops)
         self.assertEqual((r.nozzle_temperature, r.bed_temperature), (275, 80))
         self.assertAlmostEqual(r.filament_mm, 1997.07, delta=0.5)  # sum of extruding E moves
-        self.assertEqual(r.min_layer, -6)
+        # Cura's raft layers here are -6..-3 (it skips -2 and -1); the printer needs consecutive numbers.
+        layers = [struct.unpack("<i", a[:4])[0] for op, a in C.iter_commands(r.data) if op == C.Op.LAYER]
+        self.assertEqual(layers, list(range(layers[0], layers[0] + len(layers))))
+        self.assertEqual(r.min_layer, -4)
 
     def test_full_file_round_trip(self):
         data = writer.build(self.gcode, material="Z-ABS", layer_mm=0.2, raft=True)

@@ -29,8 +29,8 @@ from . import ZCodex2Writer
 catalog = i18nCatalog("cura")
 
 # Zortrax printerStatus -> Cura printer / job state strings
-PRINTER_STATE = {"printing": "printing", "paused": "paused", "pausing": "paused", "idle": "idle",
-                 "heating": "pre_print", "failsafe": "error", "sleep": "idle", "aborting": "printing",
+PRINTER_STATE = {"printing": "printing", "paused": "paused", "pausing": "paused", "idle": "idle", "idling": "idle",
+                 "heating": "pre_print", "failsafe": "error", "sleep": "idle", "sleeping": "idle", "aborting": "printing",
                  "finished": "idle", "maintenance": "maintenance"}
 JOB_STATE = {"printing": "printing", "heating": "pre_print", "paused": "paused", "pausing": "pausing",
              "aborting": "aborting", "finished": "finished"}
@@ -114,6 +114,19 @@ class ZortraxOutputDevice(PrinterOutputDevice):
             CuraApplication.getInstance().callLater(self._applyError, str(e))
         finally:
             self._busy = False
+
+    def _wake_if_sleeping(self) -> None:
+        """Like Z-Suite: wake the printer only when it reports "sleeping" (wakeUp drops the connection)."""
+        try:
+            state = lan.fields(self._client.status()[0]).get("printerStatus")
+        except lan.PrinterError:
+            return
+        if state == "sleeping":
+            try:
+                self._client.control("wakeUp")
+            except lan.PrinterError:
+                pass
+            time.sleep(1)
 
     def _applyError(self, text: str) -> None:
         self._last_error = text
@@ -306,11 +319,8 @@ class ZortraxOutputDevice(PrinterOutputDevice):
         def run():
             try:
                 with self._lock:
-                    try:
-                        self._client.control("wakeUp")
-                    except lan.PrinterError:
-                        pass
-                    self._client.print_file("/" + name, forced=False)
+                    self._wake_if_sleeping()
+                    self._client.print_file(name, forced=False)
                 CuraApplication.getInstance().callLater(self._update)
             except Exception as e:
                 info = re.search(r'"startPrintAdditionalInfo"\s*:\s*"?(\d+)', str(e))
@@ -386,10 +396,7 @@ class ZortraxOutputDevice(PrinterOutputDevice):
                 app.callLater(message.setProgress, int(sent * 100 / max(total, 1)))
             with self._lock:
                 lan.upload_bytes(self._client, data, remote, progress)
-                try:
-                    self._client.control("wakeUp")
-                except lan.PrinterError:
-                    pass
+                self._wake_if_sleeping()
                 try:
                     self._client.print_file(remote, forced=False)
                 except lan.PrinterError as e:

@@ -11,7 +11,7 @@ JPEG = base64.b64decode(
 
 CAMERA_FILE = os.environ.get("FAKE_CAMERA_JPEG")
 
-STATE = {"printerStatus": "idle", "progress": 0, "filename": "", "lights": "off"}
+STATE = {"printerStatus": "idling", "progress": 0, "filename": "", "lights": "off"}
 
 
 def log(storage, entry):
@@ -30,22 +30,24 @@ def handle(storage, cmd):
              "printingInProgress": 1 if STATE["printerStatus"] == "printing" else 0}
         ok["fields"] = [{"name": k, "value": f.get(k, 0)} for k in cmd.get("fields", [])]
     elif t == "printStatus":
+        if STATE["printerStatus"] == "idling":
+            return {"type": t, "status": "2"}  # what the real M200 Plus (firmware 2.6.15) answers when idle
         if STATE["printerStatus"] == "printing":
             STATE["progress"] = min(100, STATE["progress"] + 5)
         f = {"progress": STATE["progress"], "filename": STATE["filename"], "metadata": json.dumps({"PrintTime": 1800}), "userSettings": ""}
         ok["fields"] = [{"name": k, "value": f.get(k)} for k in cmd.get("fields", [])]
     elif t == "version":
-        f = {"protocol": "1", "firmware": "2.6.3", "software": "1.0", "hardware": "24"}
+        f = {"protocol": 1, "firmware": "2.6.15", "software": 23727, "hardware": 24}  # types as the real printer
         ok["fields"] = [{"name": k, "value": f.get(k)} for k in cmd.get("fields", [])]
     elif t == "getCameraPreview":
         ok["cameraPreviewData"] = base64.b64encode(open(CAMERA_FILE, "rb").read() if CAMERA_FILE else JPEG).decode()
     elif t == "printFromStorage":
-        path = os.path.join(storage, cmd["path"].lstrip("/"))
-        if not os.path.exists(path):
+        path = os.path.join(storage, cmd["path"])
+        if cmd["path"].startswith("/") or not os.path.exists(path):  # the real printer wants a bare name
             return {"type": t, "status": "3", "startPrintAdditionalInfo": 1}
         STATE.update(printerStatus="printing", progress=0, filename=os.path.basename(path))
     elif t in ("pause", "resume", "abort"):
-        STATE["printerStatus"] = {"pause": "paused", "resume": "printing", "abort": "idle"}[t]
+        STATE["printerStatus"] = {"pause": "paused", "resume": "printing", "abort": "idling"}[t]
     elif t == "setSetting":
         for s in cmd.get("settings", []):
             STATE[s["name"]] = s["value"]

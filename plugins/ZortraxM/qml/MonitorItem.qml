@@ -32,7 +32,7 @@ Component
                 case "printing": return catalog.i18nc("@label:status", "Printing")
                 case "heating": return catalog.i18nc("@label:status", "Heating")
                 case "paused": case "pausing": return catalog.i18nc("@label:status", "Paused")
-                case "idle": return catalog.i18nc("@label:status", "Idle")
+                case "idle": case "idling": return catalog.i18nc("@label:status", "Idle")
                 case "sleep": return catalog.i18nc("@label:status", "Sleeping")
                 case "failsafe": return catalog.i18nc("@label:status", "Needs attention")
                 case "": return catalog.i18nc("@label:status", "Connecting…")
