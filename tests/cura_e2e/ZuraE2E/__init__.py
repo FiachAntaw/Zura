@@ -44,7 +44,32 @@ class E2E(Extension):
             win.setWidth(1500); win.setHeight(950)
         except Exception as e:
             log(f"welcome/resize: {e}")
+        if os.environ.get("ZURA_E2E_DUMP"):
+            QTimer.singleShot(3000, self.step_dump)
+            return
         QTimer.singleShot(3000, self.step_info)
+
+    @guard
+    def step_dump(self):
+        """Dump the resolved value of every preset setting for every material x quality type."""
+        app = CuraApplication.getInstance()
+        mm = app.getMachineManager()
+        reg = app.getContainerRegistry()
+        keys = json.loads(os.environ.get("ZURA_E2E_KEYS", "[]"))
+        quals = reg.findInstanceContainersMetadata(type="quality", definition="zortrax_m200_plus")
+        combos = sorted({(q["material"], q["quality_type"]) for q in quals if q.get("material")})
+        out = {}
+        for mat_id, qt in combos:
+            mm.setMaterialById("0", mat_id)
+            mm.setQualityGroupByQualityType(qt)
+            stack = app.getGlobalContainerStack()
+            ext = stack.extruderList[0]
+            got = (ext.material.getMetaDataEntry("base_file"), stack.quality.getMetaDataEntry("quality_type"))
+            out[f"{mat_id}|{qt}"] = {"active": list(got), "values": {k: [str(ext.getProperty(k, "value")), str(stack.getProperty(k, "value"))] for k in keys}}
+        with open(os.environ["ZURA_E2E_DUMP"], "w") as f:
+            json.dump(out, f, indent=0, sort_keys=True)
+        log(f"dumped {len(out)} combos")
+        QTimer.singleShot(500, app.closeApplication)
 
     @guard
     def step_info(self):
