@@ -14,7 +14,7 @@ Derived from `test-cube-20mm-20261113.zcodex2` (Z-Suite 3.7.0, Z-ABS, 0.2 mm, ra
 
 - `AdditionalMetadata`: JSON, per-percent material usage, pauses.
 - `UserSettingsData`: JSON report of the Z-Suite settings used (useful for preset porting).
-- `ConfigurationData`: **encrypted**. Per the zsuite-mcp research, a fresh Rijndael key/IV per export, RSA-encrypted. Begins `1c 22 00 00 00 01 00 00`. Contents unknown.
+- `ConfigurationData`: the full Z-Suite slicer `Configuration` object (about 300 fields: speeds, feeds, temperatures, raft, support, fan, linear advance…) serialized as JSON with Newtonsoft, then encrypted. Layout: `int32 total`, then `int32 len + RSA-OAEP(AES key)`, `int32 len + RSA-OAEP(AES IV)`, `int32 len + AES-CBC/PKCS7(JSON)`. RSA is 2048-bit, exponent AQAB. The **public** key is embedded in Z-Suite.dll (string id 75326), so we can produce valid ConfigurationData ourselves. We cannot decrypt Z-Suite's (the private key is on the printer side).
 - `ZCodeData`: **not encrypted**, binary command stream (below).
 
 ## ZCodeData command stream (solved framing)
@@ -23,17 +23,43 @@ Each command: `[len:u8][opcode:u8][args: len-2 bytes][crc:u8]`. CRC is CRC-8, po
 
 Integers are little-endian int32; distances in µm.
 
-| Opcode | Seen as | Best guess |
+Command names recovered from Z-Suite.dll (`tools/dotnet/ZCodeDump.cs` decodes a file using Z-Suite's own classes; full cube listing in `docs/test-cube-decoded.txt`):
+
+| Op | Name | Args |
 | --- | --- | --- |
-| 0x01 | `flags, axes, int32 × popcount(axes)` | Move. Axes bit0 X, bit1 Y, bit2 Z, bit3 E (relative µm of filament), bit5 likely fan. Flags vary by feature (0x0a raft/infill, 0x0e perimeter, 0xfc/0xfd/0xfe travel/retract/prime, 0xff special) |
-| 0x1b | same as 0x01 | Travel move (no extrusion) |
-| 0x02 | int32 | Feed rate (values 180…12000, likely mm/min) |
-| 0x10 | int32 | Layer index (raft starts at -8) |
-| 0x0e | int32 | Heatbed temperature (80) |
-| 0x04, 0x05, 0x07, 0x08, 0x0b, 0x13, 0x14, 0x15, 0x1a, 0x1c, 0x1e | small args | Start/end sequence, fan, waits, homing etc. To confirm against Z-Suite.dll |
+| 1 | PrintMove | moveType u8, axisMask u8, int32 per set axis (bit0 X, 1 Y, 2 Z, 3 E relative, 5 Fan2, others TBD) |
+| 2 | SetFeedrate | int32 mm/min |
+| 3 | SetAsZero | axis set |
+| 4 | SetAsValue | axisMask + int32 values (G92 equivalent) |
+| 5 | MoveToStart | axis set (homing) |
+| 6 | MoveToEnd | axis set |
+| 7 | SelectExtruder | u8 |
+| 8 | SetExtruderTemperature | u8 extruder, int32 °C |
+| 9 / 10 | SetAbsolute / SetRelativePositioning | axis set |
+| 11 | ReportProgress | u8 percent |
+| 12 | Sleep | uint32 |
+| 13 | SetExtrudeRatio | moveType u8, float |
+| 14 | SetBedTemperature | int32 |
+| 15 | Pause | int32, int32 |
+| 16 | Layer | int32 (raft layers negative) |
+| 17 | MoveToSpecialPosition | enum |
+| 18 | CustomData | bytes |
+| 19 | PrintEnd | – |
+| 20 | WaitForHeating | optional uint32 |
+| 21 | CmdIgnoreHotendEncoders | flags |
+| 22 | SetChamberTemperature | int32 |
+| 26 | MetaData | u8 (e.g. RaftStart) |
+| 27 | PrintJump | moveType, X/Y/Z (travel) |
+| 28 | SetLinearAdvance | float K, u8 extruder |
+| 29 | ScanPlatformDeformation | – |
+| 30 | SetPlatformCompensationRange | int32 min, int32 max (µm) |
+
+Move types tag every extrusion with a feature (ModelContour 0, VisibleInfill 1, InvisibleInfill 3, Support* 4–9, Raft 10–13, VisibleTopInfill 14, BridgeInfill 25, Brim 34, Seam 223, RetractionBack 253, RetractionForward 254, Jump 252…). Cura's `;TYPE:` comments map onto these.
+
+Start sequence Z-Suite emits (M200 Plus): `SetAsValue E0, SetBedTemperature, SetExtruderTemperature, WaitForHeating, SetPlatformCompensationRange(330-1530), MoveToStart XY, MoveToStart Z, SetAsValue XYZ0, feed 180, PrintMove Z15000, SetLinearAdvance ×2, MetaData RaftStart, Layer…`. End: `RetractionBack, Jump Z, extruder 0 °C, MoveToStart XY, ReportProgress 100, PrintEnd`.
 
 ## Open questions
 
-1. Does the printer require a valid `ConfigurationData`? Encrypting it ourselves needs Zortrax's RSA public key (in Z-Suite.dll) plus the plaintext layout. Reusing one from a Z-Suite export may also work.
-2. Exact meaning of the setup opcodes and flag bits, from decompiling Z-Suite.dll.
+1. Which `ConfigurationData` fields the firmware actually uses. We can generate it, but must fill it sensibly (from Z-Suite's default profile for the chosen material).
+2. Remaining PrintMove axis bits (4, 6, 7).
 3. Firmware-side checks at `printFromStorage` (startPrintAdditionalInfo: corrupted file=1, wrong device=2…).
