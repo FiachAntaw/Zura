@@ -55,6 +55,7 @@ class ZortraxController(PrinterOutputController):
 class ZortraxOutputDevice(PrinterOutputDevice):
     cameraChanged = pyqtSignal()
     statusChanged = pyqtSignal()
+    filesChanged = pyqtSignal()
 
     def __init__(self, host: str, serial: str = "", definition_id: str = "zortrax_m200_plus",
                  firmware: str = "", parent: QObject = None) -> None:
@@ -74,6 +75,9 @@ class ZortraxOutputDevice(PrinterOutputDevice):
         self._last_error = ""
         self._uploading = False
         self._loaded_material = ""
+        self._files: list = []
+        self._files_loading = False
+        self._files_requested = False
         self._model_name = name_for_definition(definition_id)
         self.setName(self._model_name + (" (" + serial + ")" if serial else ""))
         self.setShortDescription(catalog.i18nc("@action:button", "Print over network"))
@@ -122,6 +126,9 @@ class ZortraxOutputDevice(PrinterOutputDevice):
         self._status = {**status, **{"job_" + k: v for k, v in job.items()}}
         self._last_error = ""
         self.setConnectionState(ConnectionState.Connected)
+        if not self._files_requested:
+            self._files_requested = True
+            self.refreshFiles()
         printer = self._printers[0]
         serial = status.get("serialNumber")
         if serial and printer.name != "{0} ({1})".format(self._model_name, serial):
@@ -260,6 +267,69 @@ class ZortraxOutputDevice(PrinterOutputDevice):
                 CuraApplication.getInstance().callLater(self._showError, str(e))
         threading.Thread(target=run, daemon=True).start()
 
+    # ------------------------------------------------------------------ files on the printer
+    @pyqtProperty("QVariantList", notify=filesChanged)
+    def printerFiles(self) -> list:
+        return self._files
+
+    @pyqtProperty(bool, notify=filesChanged)
+    def filesLoading(self) -> bool:
+        return self._files_loading
+
+    @pyqtSlot()
+    def refreshFiles(self) -> None:
+        if self._files_loading:
+            return
+        self._files_loading = True
+        self.filesChanged.emit()
+        threading.Thread(target=self._listFiles, daemon=True).start()
+
+    def _listFiles(self) -> None:
+        app = CuraApplication.getInstance()
+        try:
+            with self._lock:
+                entries = self._client.list_files("/")
+            app.callLater(self._setFiles, _print_files(entries), None)
+        except Exception as e:
+            app.callLater(self._setFiles, None, str(e))
+
+    def _setFiles(self, files, error) -> None:
+        self._files_loading = False
+        if files is not None:
+            self._files = files
+        elif error:
+            Logger.log("w", "Could not list files on %s: %s", self._host, error)
+        self.filesChanged.emit()
+
+    @pyqtSlot(str)
+    def printStoredFile(self, name: str) -> None:
+        def run():
+            try:
+                with self._lock:
+                    try:
+                        self._client.control("wakeUp")
+                    except lan.PrinterError:
+                        pass
+                    self._client.print_file("/" + name, forced=False)
+                CuraApplication.getInstance().callLater(self._update)
+            except Exception as e:
+                info = re.search(r'"startPrintAdditionalInfo"\s*:\s*"?(\d+)', str(e))
+                reason = lan.describe_start_info(info.group(1)) if info else str(e)
+                CuraApplication.getInstance().callLater(
+                    self._showError, catalog.i18nc("@info", "The printer refused to start {0}: {1}").format(name, reason))
+        threading.Thread(target=run, daemon=True).start()
+
+    @pyqtSlot(str)
+    def deleteStoredFile(self, name: str) -> None:
+        def run():
+            try:
+                with self._lock:
+                    self._client.delete("/" + name)
+            except Exception as e:
+                CuraApplication.getInstance().callLater(self._showError, str(e))
+            CuraApplication.getInstance().callLater(self.refreshFiles)
+        threading.Thread(target=run, daemon=True).start()
+
     def _showError(self, text: str) -> None:
         Message(text, title=catalog.i18nc("@info:title", "Zortrax printer"), message_type=Message.MessageType.ERROR).show()
 
@@ -340,6 +410,26 @@ class ZortraxOutputDevice(PrinterOutputDevice):
             Message(catalog.i18nc("@info", "Print started on the Zortrax printer."), title="Zortrax",
                     message_type=Message.MessageType.POSITIVE).show()
             self._update()
+            self.refreshFiles()
+
+
+def _print_files(entries) -> list:
+    """Printable files from an FTP listing, newest first."""
+    out = []
+    for e in entries:
+        name = e.get("name") or (e.get("listing", "").split()[-1] if e.get("listing") else "")
+        if e.get("type") in ("dir", "cdir", "pdir") or not name.lower().endswith((".zcodex", ".zcodex2")):
+            continue
+        modify = str(e.get("modify", ""))
+        when = "{0}-{1}-{2} {3}:{4}".format(modify[0:4], modify[4:6], modify[6:8], modify[8:10], modify[10:12]) if len(modify) >= 12 else ""
+        try:
+            n = int(e.get("size") or 0)
+            size = "{0:.1f} MB".format(n / 1e6) if n >= 1e6 else ("{0} KB".format(max(1, round(n / 1e3))) if n else "")
+        except ValueError:
+            size = ""
+        out.append({"name": name, "size": size, "modified": when, "sort": modify})
+    out.sort(key=lambda f: f["sort"], reverse=True)
+    return out
 
 
 def _norm(name: str) -> str:

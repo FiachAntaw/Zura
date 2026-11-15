@@ -39,6 +39,7 @@ class ZCodex2Writer(MeshWriter):
         stack = CuraApplication.getInstance().getGlobalContainerStack()
         extruder = stack.extruderList[0]
         material = _material_name(extruder.material.getMetaDataEntry("base_file", extruder.material.getId()))
+        definition = stack.definition
         quality_type = stack.quality.getMetaDataEntry("quality_type", "") or ""
         try:
             data = zwriter.build(
@@ -48,6 +49,10 @@ class ZCodex2Writer(MeshWriter):
                 quality="Draft" if quality_type.endswith("_draft") else "High",
                 nozzle_mm=float(extruder.getProperty("machine_nozzle_size", "value")),
                 raft=stack.getProperty("adhesion_type", "value") == "raft",
+                printer_name=str(definition.getMetaDataEntry("zortrax_printer_name", "M200 Plus")),
+                printer_model_id=int(definition.getMetaDataEntry("zortrax_printer_model_id", 24)),
+                min_firmware=str(definition.getMetaDataEntry("zortrax_min_firmware", "2.6.0")),
+                max_z_mm=float(stack.getProperty("machine_height", "value")),
             )
         except Exception as e:
             Logger.logException("e", "Failed to build zcodex2")

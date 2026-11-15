@@ -76,5 +76,25 @@ class TranslatorTests(unittest.TestCase):
         self.assertEqual(header["CommandCount"], sum(1 for _ in C.iter_commands(entries["ZCodeData"])))
         self.assertEqual(header["Materials"][0]["Temperature"], 275)
 
+class PauseTests(unittest.TestCase):
+    def test_pause_at_height(self):
+        """Cura's PauseAtHeight block becomes one Zortrax Pause after the next Layer; its park moves are dropped."""
+        g = ["M83", "G92 E0", ";LAYER_COUNT:3", ";LAYER:0", "G0 X10 Y10 Z0.2", "G1 X20 E1",
+             ";TYPE:CUSTOM---------------; Pause at end of Preview Layer 2 (end of Gcode LAYER:1)",
+             "G1 F300 Z5", "G1 X190 Y190", "M0 Click to resume", "G1 X20 Y10", "G1 Z0.2",
+             ";--------------------------; End of the Pause code", ";TIME_ELAPSED:12.5",
+             "G0 Z0.4", ";LAYER:1", "G1 X10 E1"]
+        r = translate(g, Options())
+        cmds = list(C.iter_commands(r.data))
+        ops = [op for op, _ in cmds]
+        i = ops.index(C.Op.PAUSE)
+        self.assertEqual(ops[i - 1], C.Op.LAYER)
+        self.assertEqual(struct.unpack("<ii", cmds[i][1]), (1, 400))
+        self.assertEqual(ops.count(C.Op.PAUSE), 1)
+        self.assertNotIn(190000, [v for op, a in cmds if op in (C.Op.PRINT_MOVE, C.Op.PRINT_JUMP)
+                                  for v in C.decode_axes(a[1:]).values()])
+        self.assertEqual(r.pauses, [{"Time": 12, "Material": None, "LayerNumber": 1}])
+
+
 if __name__ == "__main__":
     unittest.main()

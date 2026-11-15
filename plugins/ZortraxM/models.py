@@ -5,8 +5,9 @@ from typing import Optional
 _RANGES = [
     (24, 40, "zortrax_m200_plus", "Zortrax M200 Plus"),
     (50, 60, "zortrax_m300_plus", "Zortrax M300 Plus"),
-    (60, 70, "zortrax_m300_dual", "Zortrax M300 Dual"),
 ]
+# The M300 Dual (hardware 60-69) is left out: it needs dual-extrusion support that Zura doesn't have yet,
+# so it isn't offered in the Add printer list.
 
 
 def model_for_hardware(hardware) -> Optional[tuple]:

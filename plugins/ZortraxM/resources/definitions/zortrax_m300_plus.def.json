@@ -1,0 +1,24 @@
+{
+    "version": 2,
+    "name": "Zortrax M300 Plus",
+    "inherits": "zortrax_m200_plus",
+    "metadata": {
+        "visible": true,
+        "author": "Zura",
+        "manufacturer": "Zortrax",
+        "file_formats": "application/x-zortrax-zcodex2",
+        "platform": "zortrax_m300_plus_platform.stl",
+        "platform_offset": [0, 0, 0],
+        "quality_definition": "zortrax_m200_plus",
+        "machine_extruder_trains": { "0": "zortrax_m300_plus_extruder_0" },
+        "zortrax_printer_model_id": 50,
+        "zortrax_printer_name": "M300 Plus",
+        "zortrax_min_firmware": "2.6.0"
+    },
+    "overrides": {
+        "machine_name": { "default_value": "Zortrax M300 Plus" },
+        "machine_width": { "default_value": 300 },
+        "machine_depth": { "default_value": 300 },
+        "machine_height": { "default_value": 300 }
+    }
+}

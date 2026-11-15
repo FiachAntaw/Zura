@@ -20,7 +20,17 @@ class E2E(Extension):
         CuraApplication.getInstance().engineCreatedSignal.connect(self.on_engine)
 
     def on_engine(self):
+        if os.environ.get("ZURA_E2E_INSTALL"):
+            QTimer.singleShot(4000, self.step_install)
+            return
         QTimer.singleShot(4000, self.step_machine)
+
+    def step_install(self):
+        """Install a .curapackage the way drag-and-drop does; Cura applies it on the next start."""
+        app = CuraApplication.getInstance()
+        pid = app.getPackageManager().installPackage(os.environ["ZURA_E2E_INSTALL"])
+        log(f"install scheduled: {pid}")
+        QTimer.singleShot(1000, app.closeApplication)
 
     def guard(fn):
         def wrap(self, *a):
@@ -34,8 +44,9 @@ class E2E(Extension):
     @guard
     def step_machine(self):
         app = CuraApplication.getInstance()
-        if not app.getGlobalContainerStack() or app.getGlobalContainerStack().definition.getId() != "zortrax_m200_plus":
-            app.getMachineManager().addMachine("zortrax_m200_plus")
+        machine = os.environ.get("ZURA_E2E_MACHINE", "zortrax_m200_plus")
+        if not app.getGlobalContainerStack() or app.getGlobalContainerStack().definition.getId() != machine:
+            app.getMachineManager().addMachine(machine)
         try:
             wm = app.getWelcomePagesModel()
             wm._should_show_welcome_flow = False
@@ -167,6 +178,7 @@ class E2E(Extension):
         log(json.dumps({"machine": stack.definition.getId(), "material": ext.material.getId(),
                         "quality": stack.quality.getId(), "quality_type": stack.quality.getMetaDataEntry("quality_type"),
                         "layer_height": stack.getProperty("layer_height", "value"),
+                        "volume": [stack.getProperty(k, "value") for k in ("machine_width", "machine_depth", "machine_height")],
                         "print_temp": ext.getProperty("material_print_temperature", "value"),
                         "speed_wall_0": ext.getProperty("speed_wall_0", "value"),
                         "adhesion": stack.getProperty("adhesion_type", "value"),
@@ -309,6 +321,19 @@ class E2E(Extension):
         app = CuraApplication.getInstance()
         dev = app.getOutputDeviceManager().getOutputDevice("zortrax-127.0.0.1")
         log(f"after pause: state={dev.zortraxStatus.get('printerStatus')}")
+        files = dev.printerFiles
+        log(f"printer files: {len(files)} newest={files[0] if files else None}")
+        if files:
+            self._deleted = files[-1]["name"]
+            dev.deleteStoredFile(self._deleted)
+        QTimer.singleShot(4000, self.step_net4)
+
+    @guard
+    def step_net4(self):
+        app = CuraApplication.getInstance()
+        dev = app.getOutputDeviceManager().getOutputDevice("zortrax-127.0.0.1")
+        names = [f["name"] for f in dev.printerFiles]
+        log(f"after delete: {len(names)} files, deleted still listed={getattr(self, '_deleted', None) in names}")
         log("done")
         QTimer.singleShot(500, app.closeApplication)
 

@@ -44,7 +44,9 @@ def _grams(material: str, mm: float) -> float:
 
 def build(gcode: Iterable[str], *, material: str = "Z-ABS", layer_mm: float = 0.2,
           quality: str = "High", nozzle_mm: float = 0.4, raft: bool = False,
-          nozzle_temperature: Optional[int] = None, bed_temperature: Optional[int] = None) -> bytes:
+          nozzle_temperature: Optional[int] = None, bed_temperature: Optional[int] = None,
+          printer_name: str = "M200 Plus", printer_model_id: int = 24, min_firmware: str = "2.6.0",
+          max_z_mm: float = 180.0) -> bytes:
     profile = load_profile(material, layer_mm, quality)
     cfg = OrderedDict(profile["configuration"])
     opts = Options(
@@ -52,6 +54,7 @@ def build(gcode: Iterable[str], *, material: str = "Z-ABS", layer_mm: float = 0.
         nozzle_temperature=nozzle_temperature or cfg.get("TempExtruder", 250),
         linear_advance_k=float(cfg.get("LinearAdvanceKFactorModel", 0.0)),
         raft=raft,
+        max_z_mm=max_z_mm,
     )
     result = translate(gcode, opts)
 
@@ -70,12 +73,15 @@ def build(gcode: Iterable[str], *, material: str = "Z-ABS", layer_mm: float = 0.
                                 ("Temperature", result.nozzle_temperature)])],
         bed_temperature=result.bed_temperature, command_count=result.command_count,
         print_time_s=result.print_time_s, nozzle_diameter=nozzle_mm, bbox=result.bbox,
-        layer_thickness=layer_mm, total_layers=result.layers)
+        layer_thickness=layer_mm, total_layers=result.layers,
+        printer_name=printer_name, printer_model_id=printer_model_id, min_firmware=min_firmware)
 
     usages = [OrderedDict([("Percentage", p), ("UsageGrams", f"{_grams(material, mm):.2f}"),
                            ("SupportUsage", "0.00")]) for p, mm in result.progress_usage_mm]
     additional = OrderedDict([("Name", "AdditionalMetadata"), ("Layers", None),
-                              ("MaterialUsages", usages), ("Pauses", [])])
+                              ("MaterialUsages", usages),
+                              ("Pauses", [OrderedDict([("Time", p["Time"]), ("Material", p["Material"]),
+                                                       ("LayerNumber", p["LayerNumber"])]) for p in result.pauses])])
 
     with open(os.path.join(HERE, "user_settings_template.json"), encoding="utf-8") as f:
         report = json.load(f, object_pairs_hook=OrderedDict)
@@ -87,7 +93,7 @@ def build(gcode: Iterable[str], *, material: str = "Z-ABS", layer_mm: float = 0.
         "LayerThickness": f"{layer_mm:.2f} mm", "NozzleDiameter": f"{nozzle_mm} mm",
         "ExtruderTemperature": result.nozzle_temperature,
         "PlatformTemperature": result.bed_temperature, "RaftEnabled": raft,
-        "Quality": quality, "Printer": "Zortrax M200 Plus",
+        "Quality": quality, "Printer": "Zortrax " + printer_name,
     })
 
     entries = {

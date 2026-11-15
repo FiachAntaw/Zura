@@ -260,6 +260,110 @@ Component
             }
         }
 
+        // Files stored on the printer
+        Rectangle
+        {
+            id: filesCard
+            anchors.top: card.bottom
+            anchors.topMargin: UM.Theme.getSize("default_margin").height
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: card.width
+            height: filesColumn.height + 2 * UM.Theme.getSize("default_margin").height
+            color: UM.Theme.getColor("monitor_card_background")
+            border.color: UM.Theme.getColor("monitor_card_border")
+            border.width: UM.Theme.getSize("default_lining").width
+            radius: UM.Theme.getSize("default_radius").width
+            visible: !!device
+
+            Column
+            {
+                id: filesColumn
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: UM.Theme.getSize("default_margin").width
+                spacing: UM.Theme.getSize("narrow_margin").height
+
+                RowLayout
+                {
+                    width: parent.width
+                    UM.Label
+                    {
+                        Layout.fillWidth: true
+                        font: UM.Theme.getFont("large_bold")
+                        text: catalog.i18nc("@title", "Files on this printer")
+                    }
+                    UM.Label
+                    {
+                        visible: device && device.filesLoading
+                        text: catalog.i18nc("@label", "Loading…")
+                        color: UM.Theme.getColor("text_medium")
+                    }
+                    Cura.TertiaryButton
+                    {
+                        text: catalog.i18nc("@action:button", "Refresh")
+                        enabled: reachable && device && !device.filesLoading
+                        onClicked: device.refreshFiles()
+                    }
+                }
+
+                UM.Label
+                {
+                    visible: device && !device.filesLoading && device.printerFiles.length === 0
+                    text: catalog.i18nc("@label", "No print files on the printer.")
+                    color: UM.Theme.getColor("monitor_text_disabled")
+                }
+
+                ListView
+                {
+                    id: fileList
+                    width: parent.width
+                    height: Math.min(contentHeight, 6 * 36 * screenScaleFactor)
+                    clip: true
+                    model: device ? device.printerFiles : []
+                    ScrollBar.vertical: UM.ScrollBar {}
+                    delegate: Rectangle
+                    {
+                        width: fileList.width
+                        height: 36 * screenScaleFactor
+                        color: index % 2 ? "transparent" : UM.Theme.getColor("monitor_stage_background")
+                        RowLayout
+                        {
+                            anchors.fill: parent
+                            anchors.leftMargin: UM.Theme.getSize("narrow_margin").width
+                            anchors.rightMargin: UM.Theme.getSize("narrow_margin").width
+                            spacing: UM.Theme.getSize("default_margin").width
+                            UM.Label { Layout.fillWidth: true; elide: Text.ElideMiddle; text: modelData.name }
+                            UM.Label { text: modelData.modified; color: UM.Theme.getColor("text_medium") }
+                            UM.Label { text: modelData.size; color: UM.Theme.getColor("text_medium"); Layout.preferredWidth: 60 * screenScaleFactor; horizontalAlignment: Text.AlignRight }
+                            Cura.SecondaryButton
+                            {
+                                text: catalog.i18nc("@action:button", "Print")
+                                enabled: reachable && !printing && !paused
+                                onClicked: device.printStoredFile(modelData.name)
+                            }
+                            Cura.TertiaryButton
+                            {
+                                text: catalog.i18nc("@action:button", "Delete")
+                                enabled: reachable
+                                onClicked: { deleteConfirm.fileName = modelData.name; deleteConfirm.open() }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        UM.MessageDialog
+        {
+            id: deleteConfirm
+            property string fileName: ""
+            title: catalog.i18nc("@window:title", "Delete file")
+            text: catalog.i18nc("@label", "Delete %1 from the printer? This cannot be undone.").arg(fileName)
+            standardButtons: Dialog.Yes | Dialog.No
+            onAccepted: device.deleteStoredFile(fileName)
+        }
+
         UM.MessageDialog
         {
             id: abortConfirm

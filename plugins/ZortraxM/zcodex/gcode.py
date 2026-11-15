@@ -58,6 +58,7 @@ class Result:
     progress_usage_mm: List[float] = field(default_factory=list)
     bed_temperature: int = 0
     nozzle_temperature: int = 0
+    pauses: List[dict] = field(default_factory=list)
 
 
 class Translator:
@@ -86,6 +87,10 @@ class Translator:
         self.print_time_s = 0
         self.bed = options.bed_temperature
         self.nozzle = options.nozzle_temperature
+        self.in_pause_block = False   # inside Cura's PauseAtHeight park/resume G-code
+        self.pause_pending = False    # pause before the next layer
+        self.pauses: List[dict] = []
+        self.elapsed_s = 0.0
 
     # -- helpers -----------------------------------------------------------------
     def emit(self, cmd: bytes) -> None:
@@ -134,6 +139,19 @@ class Translator:
 
     # -- G-code handling ---------------------------------------------------------
     def comment(self, text: str) -> None:
+        if "Pause at end of Preview Layer" in text:   # Cura PauseAtHeight block starts
+            self.in_pause_block = True
+            self.pause_pending = True
+            return
+        if "End of the Pause code" in text:
+            self.in_pause_block = False
+            return
+        if text.startswith("TIME_ELAPSED:"):
+            try:
+                self.elapsed_s = float(text[13:])
+            except ValueError:
+                pass
+            return
         if text.startswith("LAYER:"):
             self._start()
             n = int(text[6:])
@@ -141,6 +159,10 @@ class Translator:
             self.min_layer = min(self.min_layer, n)
             self.layers_seen.add(n)
             self.emit(C.layer(n))
+            if self.pause_pending:
+                self.pause_pending = False
+                self.emit(C.pause(n, um(self.z)))  # Cura moves to the layer's Z before ;LAYER:
+                self.pauses.append({"Time": int(self.elapsed_s), "Material": None, "LayerNumber": n})
             if self.layer_count:
                 done = len([l for l in self.layers_seen if l >= 0]) - 1
                 self._report(max(0, min(99, int(done * 100 / self.layer_count))))
@@ -164,7 +186,7 @@ class Translator:
         if comment:
             self.comment(comment.strip())
         code = code.strip().upper()
-        if not code:
+        if not code or self.in_pause_block:
             return
         words = {k: float(v) for k, v in _WORD.findall(code)}
         head = code.split()[0]
@@ -195,6 +217,8 @@ class Translator:
                 self.emit(C.set_bed_temperature(self.bed))
                 if head == "M190":
                     self.emit(C.wait_for_heating())
+        elif head in ("M0", "M1", "M25", "M601"):
+            self.pause_pending = True  # a bare pause command: pause before the next layer
         elif head == "M106":
             if self.started:
                 self.emit(C.print_move(T.UNKNOWN, fan2=int(max(0, min(255, words.get("S", 255))))))
@@ -268,6 +292,7 @@ class Translator:
             layers=len(layers), min_layer=layers[0], max_layer=layers[-1],
             filament_mm=self.filament_mm, print_time_s=self.print_time_s,
             progress_usage_mm=self.progress_usage,
+            pauses=self.pauses,
             bed_temperature=self.print_bed or self.o.bed_temperature,
             nozzle_temperature=self.print_nozzle or self.o.nozzle_temperature)
 

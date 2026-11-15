@@ -1,4 +1,4 @@
-"""Generate a simple build-plate mesh for the Zortrax M200 Plus (binary STL, Z up, mm).
+"""Generate simple build-plate meshes for the Zortrax M200 Plus and M300 Plus (binary STL, Z up, mm).
 
 The perforated print plate sits on a slightly larger heated-bed carrier with a front handle.
 Run: python3 tools/gen_platform.py
@@ -7,8 +7,9 @@ import math
 import os
 import struct
 
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "plugins", "ZortraxM", "resources", "meshes",
-                   "zortrax_m200_plus_platform.stl")
+MESHES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "plugins", "ZortraxM", "resources", "meshes")
+# machine id -> (label, print area in mm)
+MACHINES = {"zortrax_m200_plus": ("M200 Plus", 200), "zortrax_m300_plus": ("M300 Plus", 300)}
 
 
 def rounded_rect(w, d, r, seg=8, cx=0.0, cy=0.0):
@@ -45,24 +46,32 @@ def normal(t):
     return nx / l, ny / l, nz / l
 
 
-def main():
+def build(label, area):
+    plate = area + 4
     tris = []
-    tris += prism(rounded_rect(204, 204, 4), -3.0, -0.2)            # perforated print plate
-    tris += prism(rounded_rect(222, 230, 6, cy=-2), -9.0, -3.0)     # heated-bed carrier
-    tris += prism(rounded_rect(60, 14, 3, cy=-121), -7.5, -4.5)     # front handle
+    tris += prism(rounded_rect(plate, plate, 4), -3.0, -0.2)                    # perforated print plate
+    tris += prism(rounded_rect(plate + 18, plate + 26, 6, cy=-2), -9.0, -3.0)   # heated-bed carrier
+    tris += prism(rounded_rect(60, 14, 3, cy=-(plate / 2 + 19)), -7.5, -4.5)    # front handle
     for sx in (-1, 1):
-        for sy in (-1, 1):                                          # plate clamps
-            tris += prism(rounded_rect(10, 10, 5, 6, sx * 104, sy * 104), -3.0, -1.2)
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "wb") as f:
-        f.write(b"Zura Zortrax M200 Plus platform".ljust(80, b" "))
-        f.write(struct.pack("<I", len(tris)))
-        for t in tris:
-            f.write(struct.pack("<3f", *normal(t)))
-            for v in t:
-                f.write(struct.pack("<3f", *v))
-            f.write(b"\0\0")
-    print(f"{OUT}: {len(tris)} triangles")
+        for sy in (-1, 1):                                                      # plate clamps
+            tris += prism(rounded_rect(10, 10, 5, 6, sx * plate / 2, sy * plate / 2), -3.0, -1.2)
+    return tris
+
+
+def main():
+    os.makedirs(MESHES, exist_ok=True)
+    for machine, (label, area) in MACHINES.items():
+        tris = build(label, area)
+        out = os.path.join(MESHES, machine + "_platform.stl")
+        with open(out, "wb") as f:
+            f.write(f"Zura Zortrax {label} platform".encode().ljust(80, b" "))
+            f.write(struct.pack("<I", len(tris)))
+            for t in tris:
+                f.write(struct.pack("<3f", *normal(t)))
+                for v in t:
+                    f.write(struct.pack("<3f", *v))
+                f.write(b"\0\0")
+        print(f"{out}: {len(tris)} triangles")
 
 
 if __name__ == "__main__":

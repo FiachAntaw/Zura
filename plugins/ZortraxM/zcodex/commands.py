@@ -163,6 +163,10 @@ def ignore_hotend_encoders(flags: int) -> bytes:
 def platform_compensation_range(z_min: int, z_max: int, extra: bytes = b"\x00\x00") -> bytes:
     return frame(Op.SET_PLATFORM_COMPENSATION_RANGE, struct.pack("<ii", z_min, z_max) + extra)
 
+def pause(layer_index: int, z_um: int) -> bytes:
+    """Pause before printing a layer (Z-Suite inserts it right after that layer's Layer command)."""
+    return frame(Op.PAUSE, struct.pack("<ii", layer_index, z_um))
+
 def print_end() -> bytes:
     return frame(Op.PRINT_END)
 

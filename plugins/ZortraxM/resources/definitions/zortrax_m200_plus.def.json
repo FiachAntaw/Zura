@@ -51,7 +51,8 @@
             "wall_line_count",
             "z_seam_type"
         ],
-        "platform": "zortrax_m200_plus_platform.stl"
+        "platform": "zortrax_m200_plus_platform.stl",
+        "zortrax_printer_name": "M200 Plus"
     },
     "overrides": {
         "machine_name": {
