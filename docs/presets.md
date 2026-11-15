@@ -20,11 +20,15 @@ Quality types: `z10`, `z15`, `z20`, `z30` (High) and `*_draft` (Draft). Only com
 | adhesion_type = raft, raft_* speeds/layers/spacing, raft_base_thickness, raft_margin, raft_surface_margin | RB_/RG_/RS_/R2_ fields, RB_Height (= RaftPlatformGap), RB_RG_Enlarge, RS_Enlarge |
 | raft_airgap, layer_0_z_overlap | FL_ModelSpace, FL_SecondLayerLower |
 | raft_interface_thickness, raft_surface_thickness | RB_RaftDefaultHeight |
+| wall_0_material_flow, wall_x_material_flow | SL_ContourFeed, SL_InnerContourFeed ÷ (0.4 × layer ÷ filament area) |
+| infill_line_width | 0.4 × IV_InfillFeed ÷ nominal (thick, sparse infill like Z-Suite) |
+| retraction_hop_enabled, retraction_hop, retraction_min_travel | R_LiftZEnable, R_LiftZHeight, R_MinLength |
+| retraction_combing = infill | chosen so retraction counts match Z-Suite's on the test cube |
 | support_angle, support_xy_distance, support_z_distance, support_line_distance, speed_support(_interface) | 90 − SB_DefaultAngle, XyGap, ZGap × layer, SB_InfillIncrement, SB_Speed, SS_InfillSpeed |
 | material_shrinkage_percentage_xy | 100 + ShrinkageCompensation (assumed %; verify) |
 
 ## Not portable (CuraEngine has no equivalent)
-- Per-feature *feed* (`*_Feed`, mm of filament per mm of path): not mapped yet. Z-Suite extrudes about 10% more on walls and about 50% more on infill lines than Cura's line-width-based flow (see `cube-comparison.md`). Cura's per-feature flow settings (`wall_0_material_flow`, `infill_material_flow`, …) could carry these.
+- First-layer feeds (`FL_*Feed`) and raft feeds: not mapped (inconsistent across layer heights). Top/bottom skin needs no change: Z-Suite's lower feed is offset by tighter line spacing.
 - Contour entrance/exit moves, contour cutting (`ContourEntrance*`, `CutContour*`).
 - Z-Suite's "visible/invisible" infill distinction and small-area infill (`VTS_*`, `VBS_*`).
 - Support pyramid / lite / hybrid modes (`SB_Pyramid*`, `SUPPORT_LITE`).

@@ -31,6 +31,7 @@ MATERIALS = {
     "BASF Ultrafuse ABS": ("ABS", 1.05, "#f2f2f2"), "Nanovia PC-ABS V0": ("PC/ABS", 1.15, "#202020"),
 }
 
+FILAMENT_AREA = 3.14159265 * 0.875 ** 2  # 1.75 mm filament, mm2
 QUALITY_NAMES = {"10": "0.10 mm", "15": "0.15 mm", "20": "0.20 mm", "30": "0.30 mm"}
 
 
@@ -120,6 +121,19 @@ def cura_values(cfg: dict, ui: dict, layer_mm: float) -> dict:
         # seam
         "z_seam_type": "random" if ui.get("RandomSeam") else "sharpest_corner",
     }
+    # Z-Suite *_Feed values are mm of filament per mm of path. Cura extrudes line_width x layer_height
+    # per mm, so express walls as flow % and infill as a wider line (Z-Suite prints thick, sparse infill).
+    nominal = 0.4 * layer_mm / FILAMENT_AREA
+    v["wall_0_material_flow"] = round(100 * cfg["SL_ContourFeed"] / nominal)
+    v["wall_x_material_flow"] = round(100 * cfg["SL_InnerContourFeed"] / nominal)
+    v["infill_line_width"] = round(0.4 * cfg["IV_InfillFeed"] / nominal, 2)
+    # Z hop on travel (Z-Suite lifts on every travel longer than R_MinLength).
+    v["retraction_hop_enabled"] = bool(cfg.get("R_LiftZEnable", True))
+    v["retraction_hop"] = cfg.get("R_LiftZHeight", 0.2)
+    v["retraction_min_travel"] = cfg.get("R_MinLength", 2.0)
+    # Comb only through infill and retract (and lift) elsewhere: closest to Z-Suite's retraction count
+    # on the test cube (combing "all" retracts ~1/layer, "off" ~3x as often as Z-Suite).
+    v["retraction_combing"] = "infill"
     if cfg.get("ShrinkageCompensation"):
         v["material_shrinkage_percentage_xy"] = round(100 + float(cfg["ShrinkageCompensation"]), 3)
     return v
