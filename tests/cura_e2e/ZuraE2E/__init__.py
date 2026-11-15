@@ -34,7 +34,16 @@ class E2E(Extension):
     @guard
     def step_machine(self):
         app = CuraApplication.getInstance()
-        app.getMachineManager().addMachine("zortrax_m200_plus")
+        if not app.getGlobalContainerStack() or app.getGlobalContainerStack().definition.getId() != "zortrax_m200_plus":
+            app.getMachineManager().addMachine("zortrax_m200_plus")
+        try:
+            wm = app.getWelcomePagesModel()
+            wm._should_show_welcome_flow = False
+            wm.shouldShowWelcomeFlowChanged.emit()
+            win = app.getMainWindow()
+            win.setWidth(1500); win.setHeight(950)
+        except Exception as e:
+            log(f"welcome/resize: {e}")
         QTimer.singleShot(3000, self.step_info)
 
     @guard
@@ -101,7 +110,52 @@ class E2E(Extension):
         item = dev.monitorItem
         log(f"monitor item created={item is not None}")
         dev.requestWrite(app.getController().getScene().getRoot().getChildren())
+        if os.environ.get("ZURA_E2E_SHOTS"):
+            QTimer.singleShot(9000, self.step_shots)
+            return
         QTimer.singleShot(10000, self.step_net2)
+
+    @guard
+    def step_shots(self):
+        app = CuraApplication.getInstance()
+        app.getController().setActiveStage("MonitorStage")
+        QTimer.singleShot(5000, self.step_shot_monitor)
+
+    @guard
+    def step_shot_monitor(self):
+        app = CuraApplication.getInstance()
+        out = os.environ["ZURA_E2E_SHOTS"]
+        for m in list(app.getVisibleMessages()):
+            m.hide()
+        QTimer.singleShot(1500, self.step_shot_monitor2)
+
+    @guard
+    def step_shot_monitor2(self):
+        app = CuraApplication.getInstance()
+        out = os.environ["ZURA_E2E_SHOTS"]
+        app.getMainWindow().grabWindow().save(os.path.join(out, "monitor.png"))
+        log("monitor shot saved")
+        # Connect dialog: host the action's QML in its own window
+        from cura.MachineAction import MachineAction
+        action = app.getMachineActionManager().getMachineAction("ZortraxConnectAction")
+        action.refresh()
+        from PyQt6.QtQml import QQmlComponent
+        engine = app._qml_engine
+        comp = QQmlComponent(engine)
+        comp.setData(b"import QtQuick 2.15; import QtQuick.Window 2.15; import UM 1.5 as UM; Window { width: 760; height: 520; visible: true; color: UM.Theme.getColor('main_background') }", QUrl())
+        self._win = comp.create()
+        path = os.path.join(app.getPluginRegistry().getPluginPath("ZortraxM"), "qml", "ConnectAction.qml")
+        self._item = app.createQmlComponent(path, {"manager": action})
+        self._item.setParentItem(self._win.contentItem())
+        self._item.setProperty("width", 760); self._item.setProperty("height", 520)
+        QTimer.singleShot(5000, self.step_shot_connect)
+
+    @guard
+    def step_shot_connect(self):
+        out = os.environ["ZURA_E2E_SHOTS"]
+        self._win.grabWindow().save(os.path.join(out, "connect.png"))
+        log("connect shot saved")
+        QTimer.singleShot(500, CuraApplication.getInstance().closeApplication)
 
     @guard
     def step_net2(self):

@@ -1,84 +1,272 @@
+// Monitor tab for a Zortrax printer: live camera snapshot, status and controls.
+// The Monitor stage loads this through a Loader, so the root must be a Component.
 import QtQuick 2.15
-import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import QtQuick.Controls 2.15
 import UM 1.5 as UM
+import Cura 1.0 as Cura
 
-// Monitor tab for a Zortrax printer: camera snapshot, status and controls.
-Item {
-    id: root
-    property var device: OutputDevice
-    property var st: device ? device.zortraxStatus : ({})
-    anchors.fill: parent
+Component
+{
+    Rectangle
+    {
+        id: monitorFrame
+        width: maximumWidth
+        height: maximumHeight
+        color: UM.Theme.getColor("monitor_stage_background")
 
-    Rectangle { anchors.fill: parent; color: UM.Theme.getColor("main_background") }
+        property var device: OutputDevice
+        property var st: device ? device.zortraxStatus : ({})
+        property bool reachable: device && device.lastError === ""
+        property string state_: (st.printerStatus || "").toLowerCase()
+        property bool printing: state_ === "printing" || state_ === "heating"
+        property bool paused: state_ === "paused" || state_ === "pausing"
+        property real progress: st.job_progress ? parseFloat(st.job_progress) : 0
 
-    RowLayout {
-        anchors.fill: parent
-        anchors.margins: UM.Theme.getSize("default_margin").width
-        spacing: UM.Theme.getSize("default_margin").width
+        UM.I18nCatalog { id: catalog; name: "cura" }
 
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            color: "black"
-            Image {
-                anchors.fill: parent
-                fillMode: Image.PreserveAspectFit
-                cache: false
-                source: device ? device.cameraUrl : ""
-            }
-            UM.Label {
-                anchors.centerIn: parent
-                visible: !device || device.cameraUrl === ""
-                color: "white"
-                text: "Waiting for camera snapshot…"
+        function stateText(s)
+        {
+            switch (s)
+            {
+                case "printing": return catalog.i18nc("@label:status", "Printing")
+                case "heating": return catalog.i18nc("@label:status", "Heating")
+                case "paused": case "pausing": return catalog.i18nc("@label:status", "Paused")
+                case "idle": return catalog.i18nc("@label:status", "Idle")
+                case "sleep": return catalog.i18nc("@label:status", "Sleeping")
+                case "failsafe": return catalog.i18nc("@label:status", "Needs attention")
+                case "": return catalog.i18nc("@label:status", "Connecting…")
+                default: return s.charAt(0).toUpperCase() + s.slice(1)
             }
         }
 
-        ColumnLayout {
-            Layout.preferredWidth: 320
-            Layout.fillHeight: true
-            spacing: UM.Theme.getSize("default_lining").height * 6
+        // Card
+        Rectangle
+        {
+            id: card
+            anchors.top: parent.top
+            anchors.topMargin: 48 * screenScaleFactor
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: Math.min(1000 * screenScaleFactor, parent.width - 2 * UM.Theme.getSize("wide_margin").width)
+            height: content.height + 2 * UM.Theme.getSize("wide_margin").height
+            color: UM.Theme.getColor("monitor_card_background")
+            border.color: UM.Theme.getColor("monitor_card_border")
+            border.width: UM.Theme.getSize("default_lining").width
+            radius: UM.Theme.getSize("default_radius").width
 
-            UM.Label { text: device ? device.name : ""; font: UM.Theme.getFont("large_bold") }
-            UM.Label { text: "Address: " + (device ? device.host : "") }
-            UM.Label { visible: device && device.lastError !== ""; color: UM.Theme.getColor("error"); wrapMode: Text.Wrap; Layout.fillWidth: true
-                       text: device ? "Not reachable: " + device.lastError : "" }
-            UM.Label { text: "State: " + (st.printerStatus || "unknown") }
-            UM.Label { text: "Hotend: " + (st.hotendTemperature || "–") + " °C    Bed: " + (st.heatbedTemperature || "–") + " °C" }
-            UM.Label { text: "Material: " + (st.currentMaterial || "–") }
-            UM.Label { visible: !!st.job_filename; text: "Job: " + (st.job_filename || "") }
-            ProgressBar {
-                Layout.fillWidth: true
-                visible: !!st.job_progress
-                from: 0; to: 100
-                value: st.job_progress ? parseFloat(st.job_progress) : 0
-            }
-            UM.Label { visible: !!st.job_progress; text: (st.job_progress || "0") + " %" }
-            UM.Label { text: "Storage free: " + (st.storageBytesFree ? (parseFloat(st.storageBytesFree) / 1e9).toFixed(2) + " GB" : "–") }
+            RowLayout
+            {
+                id: content
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: UM.Theme.getSize("wide_margin").width
+                spacing: UM.Theme.getSize("wide_margin").width
 
-            RowLayout {
-                Button { text: "Pause"; onClicked: device.sendControl("pause") }
-                Button { text: "Resume"; onClicked: device.sendControl("resume") }
-                Button { text: "Abort"; onClicked: abortConfirm.open() }
+                // Camera
+                Rectangle
+                {
+                    Layout.preferredWidth: 480 * screenScaleFactor
+                    Layout.preferredHeight: 360 * screenScaleFactor
+                    color: UM.Theme.getColor("monitor_skeleton_loading")
+                    radius: UM.Theme.getSize("default_radius").width
+                    clip: true
+
+                    Image
+                    {
+                        anchors.fill: parent
+                        fillMode: Image.PreserveAspectCrop
+                        cache: false
+                        source: device ? device.cameraUrl : ""
+                    }
+                    UM.Label
+                    {
+                        anchors.centerIn: parent
+                        visible: !device || device.cameraUrl === ""
+                        color: UM.Theme.getColor("monitor_text_disabled")
+                        text: catalog.i18nc("@label", "Waiting for camera…")
+                    }
+                    Rectangle
+                    {
+                        anchors.left: parent.left
+                        anchors.bottom: parent.bottom
+                        anchors.margins: UM.Theme.getSize("default_margin").width
+                        visible: device && device.cameraUrl !== ""
+                        color: UM.Theme.getColor("monitor_tooltip")
+                        radius: UM.Theme.getSize("default_radius").width
+                        width: camLabel.width + 2 * UM.Theme.getSize("narrow_margin").width
+                        height: camLabel.height + UM.Theme.getSize("narrow_margin").height
+                        UM.Label
+                        {
+                            id: camLabel
+                            anchors.centerIn: parent
+                            color: UM.Theme.getColor("monitor_tooltip_text")
+                            font: UM.Theme.getFont("small")
+                            text: catalog.i18nc("@label", "Camera · refreshes every 3 s")
+                        }
+                    }
+                }
+
+                // Status column
+                ColumnLayout
+                {
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignTop
+                    spacing: UM.Theme.getSize("default_margin").height
+
+                    UM.Label
+                    {
+                        text: device && device.activePrinter ? device.activePrinter.name : "Zortrax M200 Plus"
+                        font: UM.Theme.getFont("large")
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                    }
+                    Row
+                    {
+                        spacing: UM.Theme.getSize("narrow_margin").width
+                        Rectangle
+                        {
+                            width: pillText.width + 2 * UM.Theme.getSize("narrow_margin").width
+                            height: pillText.height + UM.Theme.getSize("thin_margin").height * 2
+                            radius: height / 2
+                            color: UM.Theme.getColor("monitor_printer_family_tag")
+                            UM.Label { id: pillText; anchors.centerIn: parent; font: UM.Theme.getFont("small"); text: "M200 Plus" }
+                        }
+                        UM.Label
+                        {
+                            anchors.verticalCenter: parent.verticalCenter
+                            color: UM.Theme.getColor("text_inactive")
+                            text: device ? device.host : ""
+                        }
+                    }
+
+                    // Error banner
+                    Rectangle
+                    {
+                        Layout.fillWidth: true
+                        visible: !reachable
+                        color: UM.Theme.getColor("warning")
+                        radius: UM.Theme.getSize("default_radius").width
+                        implicitHeight: errText.implicitHeight + 2 * UM.Theme.getSize("default_margin").height
+                        UM.Label
+                        {
+                            id: errText
+                            anchors.fill: parent
+                            anchors.margins: UM.Theme.getSize("default_margin").width
+                            wrapMode: Text.Wrap
+                            text: catalog.i18nc("@label", "Printer not reachable: %1").arg(device ? device.lastError : "")
+                        }
+                    }
+
+                    UM.Label
+                    {
+                        text: stateText(state_)
+                        font: UM.Theme.getFont("medium_bold")
+                        color: state_ === "failsafe" ? UM.Theme.getColor("error") : UM.Theme.getColor("text")
+                    }
+
+                    // Temperatures and material
+                    GridLayout
+                    {
+                        columns: 2
+                        columnSpacing: UM.Theme.getSize("wide_margin").width
+                        rowSpacing: UM.Theme.getSize("narrow_margin").height
+                        Row
+                        {
+                            spacing: UM.Theme.getSize("narrow_margin").width
+                            UM.ColorImage { width: UM.Theme.getSize("section_icon").width; height: width; source: UM.Theme.getIcon("Nozzle"); color: UM.Theme.getColor("icon") }
+                            UM.Label { anchors.verticalCenter: parent.verticalCenter; text: catalog.i18nc("@label", "Nozzle %1 °C").arg(st.hotendTemperature || "–") }
+                        }
+                        Row
+                        {
+                            spacing: UM.Theme.getSize("narrow_margin").width
+                            UM.ColorImage { width: UM.Theme.getSize("section_icon").width; height: width; source: UM.Theme.getIcon("Printer"); color: UM.Theme.getColor("icon") }
+                            UM.Label { anchors.verticalCenter: parent.verticalCenter; text: catalog.i18nc("@label", "Bed %1 °C").arg(st.heatbedTemperature || "–") }
+                        }
+                        Row
+                        {
+                            spacing: UM.Theme.getSize("narrow_margin").width
+                            UM.ColorImage { width: UM.Theme.getSize("section_icon").width; height: width; source: UM.Theme.getIcon("Spool"); color: UM.Theme.getColor("icon") }
+                            UM.Label { anchors.verticalCenter: parent.verticalCenter; text: st.currentMaterial || "–" }
+                        }
+                        UM.Label
+                        {
+                            color: UM.Theme.getColor("text_inactive")
+                            text: st.storageBytesFree ? catalog.i18nc("@label", "%1 GB free").arg((parseFloat(st.storageBytesFree) / 1e9).toFixed(1)) : ""
+                        }
+                    }
+
+                    // Job
+                    Rectangle
+                    {
+                        Layout.fillWidth: true
+                        implicitHeight: 1
+                        color: UM.Theme.getColor("lining")
+                    }
+                    UM.Label
+                    {
+                        Layout.fillWidth: true
+                        elide: Text.ElideMiddle
+                        font: UM.Theme.getFont("default_bold")
+                        text: st.job_filename ? st.job_filename : catalog.i18nc("@label", "No active print job")
+                        color: st.job_filename ? UM.Theme.getColor("text") : UM.Theme.getColor("monitor_text_disabled")
+                    }
+                    Row
+                    {
+                        visible: !!st.job_filename
+                        spacing: UM.Theme.getSize("default_margin").width
+                        UM.ProgressBar
+                        {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: UM.Theme.getSize("monitor_progress_bar").width
+                            value: progress / 100
+                        }
+                        UM.Label { text: Math.round(progress) + "%" }
+                    }
+
+                    // Controls
+                    Row
+                    {
+                        spacing: UM.Theme.getSize("default_margin").width
+                        Cura.SecondaryButton
+                        {
+                            text: paused ? catalog.i18nc("@action:button", "Resume") : catalog.i18nc("@action:button", "Pause")
+                            enabled: reachable && (printing || paused)
+                            onClicked: device.sendControl(paused ? "resume" : "pause")
+                        }
+                        Cura.SecondaryButton
+                        {
+                            text: catalog.i18nc("@action:button", "Abort")
+                            enabled: reachable && (printing || paused)
+                            onClicked: abortConfirm.open()
+                        }
+                    }
+                    Row
+                    {
+                        spacing: UM.Theme.getSize("narrow_margin").width
+                        UM.Label { anchors.verticalCenter: parent.verticalCenter; text: catalog.i18nc("@label", "Lights") ; width: 60 * screenScaleFactor }
+                        Repeater
+                        {
+                            model: [["off", catalog.i18nc("@action:button", "Off")], ["white", catalog.i18nc("@action:button", "White")], ["dynamic", catalog.i18nc("@action:button", "Dynamic")]]
+                            Cura.SecondaryButton
+                            {
+                                text: modelData[1]
+                                enabled: reachable
+                                onClicked: device.setLights(modelData[0])
+                            }
+                        }
+                    }
+                }
             }
-            RowLayout {
-                UM.Label { text: "Lights:" }
-                Button { text: "Off"; onClicked: device.setLights("off") }
-                Button { text: "White"; onClicked: device.setLights("white") }
-                Button { text: "Dynamic"; onClicked: device.setLights("dynamic") }
-            }
-            Item { Layout.fillHeight: true }
         }
-    }
 
-    Dialog {
-        id: abortConfirm
-        anchors.centerIn: parent
-        title: "Abort print?"
-        modal: true
-        standardButtons: Dialog.Yes | Dialog.No
-        onAccepted: device.sendControl("abort")
-        UM.Label { text: "The current print will be stopped and cannot be resumed." }
+        UM.MessageDialog
+        {
+            id: abortConfirm
+            title: catalog.i18nc("@window:title", "Abort print")
+            text: catalog.i18nc("@label", "Are you sure you want to abort the print? It cannot be resumed.")
+            standardButtons: Dialog.Yes | Dialog.No
+            onAccepted: device.sendControl("abort")
+        }
     }
 }

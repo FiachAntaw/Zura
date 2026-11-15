@@ -9,6 +9,8 @@ import argparse, base64, json, os, socket, socketserver, struct, threading, time
 JPEG = base64.b64decode(
     "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=")
 
+CAMERA_FILE = os.environ.get("FAKE_CAMERA_JPEG")
+
 STATE = {"printerStatus": "idle", "progress": 0, "filename": "", "lights": "off"}
 
 
@@ -33,7 +35,7 @@ def handle(storage, cmd):
         f = {"progress": STATE["progress"], "filename": STATE["filename"], "metadata": json.dumps({"PrintTime": 1800}), "userSettings": ""}
         ok["fields"] = [{"name": k, "value": f.get(k)} for k in cmd.get("fields", [])]
     elif t == "getCameraPreview":
-        ok["cameraPreviewData"] = base64.b64encode(JPEG).decode()
+        ok["cameraPreviewData"] = base64.b64encode(open(CAMERA_FILE, "rb").read() if CAMERA_FILE else JPEG).decode()
     elif t == "printFromStorage":
         path = os.path.join(storage, cmd["path"].lstrip("/"))
         if not os.path.exists(path):

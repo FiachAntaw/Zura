@@ -116,6 +116,9 @@ class ZortraxOutputDevice(PrinterOutputDevice):
         self._last_error = ""
         self.setConnectionState(ConnectionState.Connected)
         printer = self._printers[0]
+        serial = status.get("serialNumber")
+        if serial and printer.name != "Zortrax " + str(serial):
+            printer.updateName("Zortrax " + str(serial))
         state = str(status.get("printerStatus", "")).lower()
         printer.updateState(PRINTER_STATE.get(state, "idle"))
         try:
