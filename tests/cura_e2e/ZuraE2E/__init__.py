@@ -75,13 +75,48 @@ class E2E(Extension):
     def step_write(self):
         from UM.PluginRegistry import PluginRegistry
         app = CuraApplication.getInstance()
-        writer = PluginRegistry.getInstance().getPluginObject("ZortraxM")
+        writer = app.getMeshFileHandler().getWriter("ZortraxM")
         with open(os.path.join(OUT, "cura-e2e.zcodex2"), "wb") as f:
             ok = writer.write(f, None)
         log(f"zcodex2 write ok={ok} info={writer.getInformation()}")
         from io import StringIO
         g = StringIO(); PluginRegistry.getInstance().getPluginObject("GCodeWriter").write(g, None)
         open(os.path.join(OUT, "cura-e2e.gcode"), "w").write(g.getvalue())
+        if os.environ.get("ZURA_E2E_NET"):
+            from UM.PluginRegistry import PluginRegistry as PR
+            import importlib
+            mod = importlib.import_module(type(writer).__module__.rsplit(".", 1)[0])
+            mod._network_plugin[0].setHostForActiveMachine("127.0.0.1")
+            log("host set")
+            QTimer.singleShot(8000, self.step_net)
+            return
+        log("done")
+        QTimer.singleShot(500, app.closeApplication)
+
+    @guard
+    def step_net(self):
+        app = CuraApplication.getInstance()
+        dev = app.getOutputDeviceManager().getOutputDevice("zortrax-127.0.0.1")
+        log(f"device={dev is not None} state={dev.connectionState if dev else None} status={dict(dev.zortraxStatus) if dev else None} camera={dev.cameraUrl if dev else None} err={dev.lastError if dev else None}")
+        item = dev.monitorItem
+        log(f"monitor item created={item is not None}")
+        dev.requestWrite(app.getController().getScene().getRoot().getChildren())
+        QTimer.singleShot(10000, self.step_net2)
+
+    @guard
+    def step_net2(self):
+        app = CuraApplication.getInstance()
+        dev = app.getOutputDeviceManager().getOutputDevice("zortrax-127.0.0.1")
+        p = dev.activePrinter
+        log(f"after send: printer state={p.state} job={(p.activePrintJob.name, p.activePrintJob.state) if p.activePrintJob else None} hotend={p.extruders[0].hotendTemperature}")
+        dev.sendControl("pause")
+        QTimer.singleShot(5000, self.step_net3)
+
+    @guard
+    def step_net3(self):
+        app = CuraApplication.getInstance()
+        dev = app.getOutputDeviceManager().getOutputDevice("zortrax-127.0.0.1")
+        log(f"after pause: state={dev.zortraxStatus.get('printerStatus')}")
         log("done")
         QTimer.singleShot(500, app.closeApplication)
 

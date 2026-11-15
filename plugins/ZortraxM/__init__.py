@@ -5,6 +5,8 @@ from UM.Resources import Resources
 
 from . import ZCodex2Writer
 
+_network_plugin = []  # set in register(); used by the connect action
+
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 
 MimeTypeDatabase.addMimeType(MimeType(
@@ -31,4 +33,12 @@ def getMetaData():
 
 
 def register(app):
-    return {"mesh_writer": ZCodex2Writer.ZCodex2Writer()}
+    from .ZortraxOutputDevicePlugin import ZortraxOutputDevicePlugin
+    from .ZortraxConnectAction import ZortraxConnectAction
+    network = ZortraxOutputDevicePlugin()
+    _network_plugin[:] = [network]
+    return {
+        "mesh_writer": ZCodex2Writer.ZCodex2Writer(),
+        "output_device": network,
+        "machine_action": ZortraxConnectAction(),
+    }

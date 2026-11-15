@@ -1,0 +1,301 @@
+"""Cura output device for a Zortrax printer on the LAN: send & print, status, camera, controls."""
+import base64
+import json
+import re
+import threading
+import time
+from io import StringIO
+from typing import Optional
+
+from PyQt6.QtCore import QObject, QUrl, pyqtProperty, pyqtSignal, pyqtSlot
+from PyQt6.QtGui import QImage
+
+from UM.Logger import Logger
+from UM.Message import Message
+from UM.PluginRegistry import PluginRegistry
+from UM.i18n import i18nCatalog
+
+from cura.CuraApplication import CuraApplication
+from cura.PrinterOutput.Models.PrintJobOutputModel import PrintJobOutputModel
+from cura.PrinterOutput.Models.PrinterOutputModel import PrinterOutputModel
+from cura.PrinterOutput.PrinterOutputController import PrinterOutputController
+from cura.PrinterOutput.PrinterOutputDevice import ConnectionState, ConnectionType, PrinterOutputDevice
+
+from .lan import client as lan
+from . import ZCodex2Writer
+
+catalog = i18nCatalog("cura")
+
+# Zortrax printerStatus -> Cura printer / job state strings
+PRINTER_STATE = {"printing": "printing", "paused": "paused", "pausing": "paused", "idle": "idle",
+                 "heating": "pre_print", "failsafe": "error", "sleep": "idle", "aborting": "printing",
+                 "finished": "idle", "maintenance": "maintenance"}
+JOB_STATE = {"printing": "printing", "heating": "pre_print", "paused": "paused", "pausing": "pausing",
+             "aborting": "aborting", "finished": "finished"}
+
+
+class ZortraxController(PrinterOutputController):
+    def __init__(self, device: "ZortraxOutputDevice") -> None:
+        super().__init__(device)
+        self.can_pause = True
+        self.can_abort = True
+        self.can_pre_heat_bed = False
+        self.can_pre_heat_hotends = False
+        self.can_send_raw_gcode = False
+        self.can_control_manually = False
+
+    def setJobState(self, job, state: str) -> None:
+        action = {"pause": "pause", "print": "resume", "abort": "abort"}.get(state)
+        if action:
+            self._output_device.sendControl(action)
+
+
+class ZortraxOutputDevice(PrinterOutputDevice):
+    cameraChanged = pyqtSignal()
+    statusChanged = pyqtSignal()
+
+    def __init__(self, host: str, serial: str = "", parent: QObject = None) -> None:
+        super().__init__(device_id="zortrax-" + host, connection_type=ConnectionType.NetworkConnection, parent=parent)
+        self._host = host
+        self._address = host
+        self._serial = serial
+        self._client = lan.PrinterClient(host, timeout=10)
+        self._lock = threading.Lock()
+        self._busy = False
+        self._status: dict = {}
+        self._camera_url = ""
+        self._camera_counter = 0
+        self._camera_enabled = True
+        self._last_error = ""
+        self._uploading = False
+        self.setName("Zortrax " + (serial or host))
+        self.setShortDescription(catalog.i18nc("@action:button", "Print over network"))
+        self.setDescription(catalog.i18nc("@properties:tooltip", "Send to the Zortrax printer at {0}").format(host))
+        self.setIconName("print")
+        self.setConnectionText(catalog.i18nc("@info:status", "Connected to Zortrax printer at {0}").format(host))
+        self._monitor_view_qml_path = PluginRegistry.getInstance().getPluginPath("ZortraxM") + "/qml/MonitorItem.qml"
+        self._update_timer.setInterval(3000)
+        printer = PrinterOutputModel(output_controller=ZortraxController(self), number_of_extruders=1)
+        printer.updateName(self.getName())
+        printer.updateType("Zortrax M200 Plus")
+        self._printers = [printer]
+        self._setAcceptsCommands(True)
+
+    # ------------------------------------------------------------------ status polling
+    def _update(self) -> None:
+        if self._busy:
+            return
+        self._busy = True
+        threading.Thread(target=self._poll, daemon=True).start()
+
+    def _poll(self) -> None:
+        try:
+            with self._lock:
+                responses = self._client.status()
+                camera = None
+                if self._camera_enabled:
+                    try:
+                        camera = self._client.camera(50)
+                    except lan.PrinterError:
+                        camera = None
+            CuraApplication.getInstance().callLater(self._applyStatus, responses, camera)
+        except Exception as e:  # network failures are expected when the printer is off
+            CuraApplication.getInstance().callLater(self._applyError, str(e))
+        finally:
+            self._busy = False
+
+    def _applyError(self, text: str) -> None:
+        self._last_error = text
+        self.setConnectionState(ConnectionState.Error)
+        self.statusChanged.emit()
+
+    def _applyStatus(self, responses, camera) -> None:
+        status = lan.fields(responses[0])
+        job = lan.fields(responses[1]) if len(responses) > 1 else {}
+        self._status = {**status, **{"job_" + k: v for k, v in job.items()}}
+        self._last_error = ""
+        self.setConnectionState(ConnectionState.Connected)
+        printer = self._printers[0]
+        state = str(status.get("printerStatus", "")).lower()
+        printer.updateState(PRINTER_STATE.get(state, "idle"))
+        try:
+            printer.extruders[0].updateHotendTemperature(float(status.get("hotendTemperature", 0)))
+            printer.updateBedTemperature(float(status.get("heatbedTemperature", 0)))
+        except (TypeError, ValueError):
+            pass
+        in_progress = str(status.get("printingInProgress", "0")) not in ("0", "False", "false", "")
+        if in_progress or state in JOB_STATE:
+            name = str(job.get("filename") or "print")
+            pj = printer.activePrintJob
+            if pj is None or pj.name != name:
+                pj = PrintJobOutputModel(output_controller=printer.getController(), key=name, name=name)
+                printer.updateActivePrintJob(pj)
+            pj.updateState(JOB_STATE.get(state, "printing"))
+            progress = self._progress(job)
+            if progress is not None:
+                total = self._estimated_seconds(job)
+                if total:
+                    pj.updateTimeTotal(total)
+                    pj.updateTimeElapsed(int(total * progress / 100))
+        else:
+            printer.updateActivePrintJob(None)
+        if camera:
+            image = QImage.fromData(base64.b64decode(camera["data"]))
+            if not image.isNull():
+                ZortraxCameraProvider.instance().setImage(self._host, image)
+                self._camera_counter += 1
+                self._camera_url = "image://zortraxcam/{0}?{1}".format(self._host, self._camera_counter)
+                self.cameraChanged.emit()
+        self.statusChanged.emit()
+
+    @staticmethod
+    def _progress(job: dict) -> Optional[float]:
+        try:
+            return float(job.get("progress"))
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _estimated_seconds(job: dict) -> int:
+        meta = job.get("metadata")
+        if isinstance(meta, str):
+            try:
+                meta = json.loads(meta)
+            except ValueError:
+                meta = {}
+        if isinstance(meta, dict):
+            try:
+                return int(meta.get("PrintTime") or 0)
+            except (TypeError, ValueError):
+                return 0
+        return 0
+
+    # ------------------------------------------------------------------ QML properties
+    @pyqtProperty(str, notify=cameraChanged)
+    def cameraUrl(self) -> str:
+        return self._camera_url
+
+    @pyqtProperty("QVariantMap", notify=statusChanged)
+    def zortraxStatus(self) -> dict:
+        return {k: str(v) for k, v in self._status.items()}
+
+    @pyqtProperty(str, notify=statusChanged)
+    def lastError(self) -> str:
+        return self._last_error
+
+    @pyqtProperty(str, constant=True)
+    def host(self) -> str:
+        return self._host
+
+    # ------------------------------------------------------------------ controls
+    @pyqtSlot(str)
+    def sendControl(self, action: str) -> None:
+        threading.Thread(target=self._control, args=(action,), daemon=True).start()
+
+    def _control(self, action: str) -> None:
+        try:
+            with self._lock:
+                self._client.control(action)
+        except Exception as e:
+            CuraApplication.getInstance().callLater(self._showError, catalog.i18nc("@info", "{0} failed: {1}").format(action, e))
+
+    @pyqtSlot(str)
+    def setLights(self, value: str) -> None:
+        def run():
+            try:
+                with self._lock:
+                    self._client.set_setting("lights", value)
+            except Exception as e:
+                CuraApplication.getInstance().callLater(self._showError, str(e))
+        threading.Thread(target=run, daemon=True).start()
+
+    def _showError(self, text: str) -> None:
+        Message(text, title=catalog.i18nc("@info:title", "Zortrax printer"), message_type=Message.MessageType.ERROR).show()
+
+    # ------------------------------------------------------------------ send & print
+    def requestWrite(self, nodes, file_name=None, limit_mimetypes=False, file_handler=None, filter_by_machine=False, **kwargs) -> None:
+        if self._uploading:
+            Message(catalog.i18nc("@info", "A file is already being sent to this printer."), title="Zortrax").show()
+            return
+        writer = ZCodex2Writer.ZCodex2Writer()
+        buffer = _BytesSink()
+        if not writer.write(buffer, nodes):
+            self._showError(writer.getInformation() or "Could not create the print file.")
+            return
+        job_name = CuraApplication.getInstance().getPrintInformation().jobName or "cura"
+        safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", job_name)[:40] or "cura"
+        remote = "/{0}_{1}.zcodex2".format(safe, time.strftime("%Y%m%d-%H%M%S"))
+        self._uploading = True
+        message = Message(catalog.i18nc("@info:status", "Sending {0} to the printer").format(remote.lstrip("/")),
+                          title="Zortrax", progress=0, dismissable=False, lifetime=0)
+        message.show()
+        threading.Thread(target=self._send, args=(buffer.getvalue(), remote, message), daemon=True).start()
+
+    def _send(self, data: bytes, remote: str, message: Message) -> None:
+        app = CuraApplication.getInstance()
+        try:
+            def progress(sent, total):
+                app.callLater(message.setProgress, int(sent * 100 / max(total, 1)))
+            with self._lock:
+                lan.upload_bytes(self._client, data, remote, progress)
+                try:
+                    self._client.control("wakeUp")
+                except lan.PrinterError:
+                    pass
+                try:
+                    self._client.print_file(remote, forced=False)
+                except lan.PrinterError as e:
+                    info = re.search(r'"startPrintAdditionalInfo"\s*:\s*"?(\d+)', str(e))
+                    reason = lan.describe_start_info(info.group(1)) if info else ""
+                    raise lan.PrinterError("The printer refused to start: " + (reason or str(e)))
+            app.callLater(self._sendDone, message, None)
+        except Exception as e:
+            Logger.logException("w", "Zortrax send failed")
+            app.callLater(self._sendDone, message, str(e))
+
+    def _sendDone(self, message: Message, error: Optional[str]) -> None:
+        self._uploading = False
+        message.hide()
+        if error:
+            self._showError(error)
+        else:
+            Message(catalog.i18nc("@info", "Print started on the Zortrax printer."), title="Zortrax",
+                    message_type=Message.MessageType.POSITIVE).show()
+            self._update()
+
+
+class _BytesSink:
+    """Minimal binary stream for MeshWriter.write()."""
+    def __init__(self):
+        self._parts = []
+
+    def write(self, data):
+        self._parts.append(bytes(data))
+
+    def getvalue(self) -> bytes:
+        return b"".join(self._parts)
+
+
+from PyQt6.QtQuick import QQuickImageProvider  # noqa: E402
+
+
+class ZortraxCameraProvider(QQuickImageProvider):
+    _instance = None
+
+    def __init__(self):
+        super().__init__(QQuickImageProvider.ImageType.Image)
+        self._images = {}
+
+    @classmethod
+    def instance(cls) -> "ZortraxCameraProvider":
+        if cls._instance is None:
+            cls._instance = ZortraxCameraProvider()
+        return cls._instance
+
+    def setImage(self, host: str, image: QImage) -> None:
+        self._images[host] = image
+
+    def requestImage(self, image_id, requested_size):
+        host = image_id.split("?", 1)[0]
+        image = self._images.get(host, QImage(640, 480, QImage.Format.Format_RGB32))
+        return image, image.size()
