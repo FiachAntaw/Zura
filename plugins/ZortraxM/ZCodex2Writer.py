@@ -20,6 +20,32 @@ def _material_name(material_id: str) -> str:
     return "Z-ABS"
 
 
+def _preview_png() -> bytes:
+    """Cura's post-slice snapshot, fitted onto a 320x180 PNG like Z-Suite's previews; b"" if unavailable."""
+    try:
+        from PyQt6.QtCore import QBuffer, QByteArray, QIODevice, Qt
+        from PyQt6.QtGui import QColor, QImage, QPainter
+        backend = CuraApplication.getInstance().getBackend()
+        snapshot = backend.getLatestSnapshot() if hasattr(backend, "getLatestSnapshot") else None
+        if snapshot is None or snapshot.isNull():
+            return b""
+        w, h = zwriter.PREVIEW_SIZE
+        canvas = QImage(w, h, QImage.Format.Format_ARGB32)
+        canvas.fill(QColor(0, 0, 0, 0))
+        scaled = snapshot.scaled(w, h, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        painter = QPainter(canvas)
+        painter.drawImage((w - scaled.width()) // 2, (h - scaled.height()) // 2, scaled)
+        painter.end()
+        data = QByteArray()
+        buf = QBuffer(data)
+        buf.open(QIODevice.OpenModeFlag.WriteOnly)
+        canvas.save(buf, "PNG")
+        return bytes(data.data())
+    except Exception:
+        Logger.logException("w", "Could not create the preview image")
+        return b""
+
+
 class ZCodex2Writer(MeshWriter):
     """Writes Cura's sliced G-code as a Zortrax .zcodex2 file."""
 
@@ -53,6 +79,7 @@ class ZCodex2Writer(MeshWriter):
                 printer_model_id=int(definition.getMetaDataEntry("zortrax_printer_model_id", 24)),
                 min_firmware=str(definition.getMetaDataEntry("zortrax_min_firmware", "2.6.0")),
                 max_z_mm=float(stack.getProperty("machine_height", "value")),
+                preview_png=_preview_png(),
             )
         except Exception as e:
             Logger.logException("e", "Failed to build zcodex2")

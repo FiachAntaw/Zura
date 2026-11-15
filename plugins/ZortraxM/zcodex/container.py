@@ -30,7 +30,7 @@ def make_header(*, printer_name="M200 Plus", printer_model_id=24, min_firmware="
         ("TotalMaterialVolumeUsed", 0.0),
         ("TotalMaterialWeightUsed", 0.0),
         ("TotalLayersCount", total_layers),
-        ("Timestamp", time.strftime("%Y%m%d%H%M%S") + "0000"),
+        ("Timestamp", time.strftime("%Y%m%d%H%M%S") + f"{int(time.time() * 10000) % 10000:04d}"),
         ("ResinMetadata", None),
     ])
 
@@ -44,6 +44,7 @@ def write(fp, header: dict, entries: dict, image: bytes = b"") -> None:
             info = zipfile.ZipInfo(name, date_time=stamp)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.create_system = 3
+            info.external_attr = 0o100644 << 16  # -rw-r--r--, as .NET's ZipArchive writes on macOS
             z.writestr(info, entries[name])
 
 def to_bytes(header: dict, entries: dict, image: bytes = b"") -> bytes:

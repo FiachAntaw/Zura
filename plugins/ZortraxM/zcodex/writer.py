@@ -46,7 +46,7 @@ def build(gcode: Iterable[str], *, material: str = "Z-ABS", layer_mm: float = 0.
           quality: str = "High", nozzle_mm: float = 0.4, raft: bool = False,
           nozzle_temperature: Optional[int] = None, bed_temperature: Optional[int] = None,
           printer_name: str = "M200 Plus", printer_model_id: int = 24, min_firmware: str = "2.6.0",
-          max_z_mm: float = 180.0) -> bytes:
+          max_z_mm: float = 180.0, preview_png: bytes = b"") -> bytes:
     profile = load_profile(material, layer_mm, quality)
     cfg = OrderedDict(profile["configuration"])
     opts = Options(
@@ -102,4 +102,20 @@ def build(gcode: Iterable[str], *, material: str = "Z-ABS", layer_mm: float = 0.
         "ConfigurationData": encrypt_configuration(json.dumps(cfg, separators=(",", ":"))),
         "UserSettingsData": container._dumps(report),
     }
-    return container.to_bytes(header, entries)
+    # Every Z-Suite file carries a 320x180 PNG preview; the printer rejects files without one.
+    return container.to_bytes(header, entries, preview_png or placeholder_png())
+
+
+PREVIEW_SIZE = (320, 180)
+
+
+def placeholder_png(width: int = PREVIEW_SIZE[0], height: int = PREVIEW_SIZE[1]) -> bytes:
+    """A plain grey 320x180 PNG, used when Cura has no snapshot to offer."""
+    import struct
+    import zlib
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+    row = b"\x00" + b"\x80\x80\x80" * width
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(row * height, 9)) + chunk(b"IEND", b""))

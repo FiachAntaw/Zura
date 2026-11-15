@@ -47,6 +47,8 @@ class E2E(Extension):
         machine = os.environ.get("ZURA_E2E_MACHINE", "zortrax_m200_plus")
         if not app.getGlobalContainerStack() or app.getGlobalContainerStack().definition.getId() != machine:
             app.getMachineManager().addMachine(machine)
+        if os.environ.get("ZURA_E2E_MATERIAL"):
+            app.getMachineManager().setMaterialById("0", os.environ["ZURA_E2E_MATERIAL"])
         try:
             wm = app.getWelcomePagesModel()
             wm._should_show_welcome_flow = False
