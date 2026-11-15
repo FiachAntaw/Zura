@@ -92,6 +92,7 @@ class Translator:
         self.pauses: List[dict] = []
         self.elapsed_s = 0.0
         self.encoders_on = False
+        self.old_z = 0.0
         self.extruder_reselected = False
 
     # -- helpers -----------------------------------------------------------------
@@ -271,6 +272,7 @@ class Translator:
             axes["y"] = um(ny)
         if "Z" in w and um(nz) != um(self.z):
             axes["z"] = um(nz)
+        self.old_z = self.z
         self.x, self.y, self.z = nx, ny, nz
         self._feed()
         if de and not axes:
@@ -285,9 +287,27 @@ class Translator:
             if de < 0:  # retract while moving (wipe): Z-Suite only retracts in place, so split it
                 self.retracted_mm += -de
                 self.emit(C.print_move(T.RETRACTION_BACK, e=um(de)))
-                self.emit(C.print_jump(T.JUMP, **axes))
+                self._jump(axes)
             else:
+                self._jump(axes)
+
+    def _jump(self, axes: dict) -> None:
+        """Travel. Z-Suite never combines Z with X/Y in one jump: lift first, or lower after moving."""
+        z = axes.pop("z", None)
+        if axes:  # Z-Suite travels always carry both X and Y
+            axes.setdefault("x", um(self.x))
+            axes.setdefault("y", um(self.y))
+        if z is None:
+            if axes:
                 self.emit(C.print_jump(T.JUMP, **axes))
+            return
+        rising = z > um(self.old_z)
+        if rising:
+            self.emit(C.print_jump(T.JUMP, z=z))
+        if axes:
+            self.emit(C.print_jump(T.JUMP, **axes))
+        if not rising:
+            self.emit(C.print_jump(T.JUMP, z=z))
 
     def _track(self, w: dict) -> None:
         if not self.relative_xyz:
