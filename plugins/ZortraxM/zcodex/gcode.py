@@ -91,6 +91,8 @@ class Translator:
         self.pause_pending = False    # pause before the next layer
         self.pauses: List[dict] = []
         self.elapsed_s = 0.0
+        self.encoders_on = False
+        self.extruder_reselected = False
 
     # -- helpers -----------------------------------------------------------------
     def emit(self, cmd: bytes) -> None:
@@ -132,6 +134,20 @@ class Translator:
         self.z = o.safe_z_mm
         self._report(0)
 
+    def _layer_preamble(self, n: int) -> None:
+        """Commands Z-Suite puts before particular layers (from Z-Suite 3.x output)."""
+        raft_index = n - self.min_layer
+        if not self.encoders_on and (n >= 0 or raft_index == 3):
+            self.encoders_on = True
+            self.emit(C.ignore_hotend_encoders(0))
+        if not self.extruder_reselected and n >= -3:
+            self.extruder_reselected = True
+            self.emit(C.select_extruder(0))
+        if n == 0 and self.o.raft:
+            self.emit(C.metadata(101))  # RaftEnd
+        if n >= 0:
+            self.emit(C.set_as_value(e=0))  # Z-Suite resets E at every model layer
+
     def _grow_bbox(self, x, y, z) -> None:
         b = self.bbox
         b[0], b[1], b[2] = min(b[0], x), min(b[1], y), min(b[2], z)
@@ -157,7 +173,10 @@ class Translator:
             n = int(text[6:])
             self.layer = n
             self.min_layer = min(self.min_layer, n)
+            first_of_layer = n not in self.layers_seen
             self.layers_seen.add(n)
+            if first_of_layer:
+                self._layer_preamble(n)
             self.emit(C.layer(n))
             if self.pause_pending:
                 self.pause_pending = False
@@ -204,9 +223,10 @@ class Translator:
         elif head == "G91":
             self.relative_xyz = True
         elif head in ("M104", "M109") and "S" in words:
+            changed = int(words["S"]) != self.nozzle
             self.nozzle = int(words["S"])
             self.print_nozzle = max(self.print_nozzle, self.nozzle)
-            if self.started and self.nozzle != 0:
+            if self.started and self.nozzle != 0 and changed:
                 self.emit(C.set_extruder_temperature(self.nozzle))
                 if head == "M109":
                     self.emit(C.wait_for_heating())
@@ -262,8 +282,10 @@ class Translator:
             self.emit(C.print_move(self.type, e=um(de), **axes))
             self._grow_bbox(nx, ny, nz)
         elif axes:
-            if de < 0:  # retract while moving (wipe); keep as a plain move
-                self.emit(C.print_move(T.RETRACTION_BACK, e=um(de), **axes))
+            if de < 0:  # retract while moving (wipe): Z-Suite only retracts in place, so split it
+                self.retracted_mm += -de
+                self.emit(C.print_move(T.RETRACTION_BACK, e=um(de)))
+                self.emit(C.print_jump(T.JUMP, **axes))
             else:
                 self.emit(C.print_jump(T.JUMP, **axes))
 
@@ -277,7 +299,7 @@ class Translator:
         self._start()
         lift = min(self.o.max_z_mm, self.z + self.o.end_lift_mm)
         self.emit(C.set_feedrate(4800))
-        self.emit(C.print_jump(T.JUMP, z=um(lift)))
+        self.emit(C.print_move(T.JUMP, z=um(lift)))
         self.emit(C.set_extruder_temperature(0))
         self.emit(C.axis_set(C.Op.MOVE_TO_START, "x", "y"))
         self._report(100)
