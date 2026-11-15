@@ -88,7 +88,13 @@ def cura_values(cfg: dict, ui: dict, layer_mm: float) -> dict:
         "cool_fan_speed_0": cfg.get("Raft_FanSpeed") or 0,
         # raft (Z-Suite default adhesion)
         "adhesion_type": "raft" if ui.get("RaftEnabled", True) else "none",
-        "raft_airgap": round(float(ui.get("RaftPlatformGap", 0.33)), 2),
+        # Z-Suite prints the first model layer FL_ModelSpace above the raft top (+ one layer) and the
+        # second layer FL_SecondLayerLower lower than nominal; Cura's raft_airgap/layer_0_z_overlap are the same.
+        # (RaftPlatformGap is the base layer's height above the platform, i.e. RB_Height, not this gap.)
+        "raft_airgap": round(float(cfg.get("FL_ModelSpace", 0.16)), 3),
+        "layer_0_z_overlap": round(float(cfg.get("FL_SecondLayerLower", 0.05)), 4),
+        "raft_interface_thickness": cfg.get("RB_RaftDefaultHeight", 0.2),
+        "raft_surface_thickness": cfg.get("RB_RaftDefaultHeight", 0.2),
         "raft_base_speed": mms(cfg["RB_Speed"]),
         "raft_interface_speed": mms(cfg["RG_Speed"]),
         "raft_surface_speed": mms(cfg["RS_Speed"]),
@@ -99,6 +105,7 @@ def cura_values(cfg: dict, ui: dict, layer_mm: float) -> dict:
         "raft_base_line_spacing": cfg["RB_Increment"],
         "raft_base_thickness": cfg["RB_Height"],
         "raft_margin": cfg.get("RB_RG_Enlarge", 3),
+        "raft_surface_margin": cfg.get("RS_Enlarge", 5.0),
         # support
         "support_angle": round(90 - float(cfg.get("SB_DefaultAngle", 30)), 1),
         "support_xy_distance": round(float(ui.get("XyGap", 0.16)), 2),

@@ -17,12 +17,14 @@ Quality types: `z10`, `z15`, `z20`, `z30` (High) and `*_draft` (Draft). Only com
 | retraction_amount, retraction_speed, retraction_prime_speed, retract_at_layer_change | RetractionDistance, R_BackSpeed, R_ForwardSpeed, R_ForceRetractionOnLayerChange |
 | speed_layer_0, speed_print_layer_0 | FLNR_ContourSpeed, FLNR_InfillSpeed |
 | cool_fan_speed_min / max, cool_min_layer_time(_fan_speed_max), cool_fan_speed_0 | Autofan* (Z-Suite ramps fan by layer time), Raft_FanSpeed |
-| adhesion_type = raft, raft_airgap, raft_* speeds/layers/spacing, raft_base_thickness, raft_margin | RaftPlatformGap, RB_/RG_/RS_/R2_ fields, RB_RG_Enlarge |
+| adhesion_type = raft, raft_* speeds/layers/spacing, raft_base_thickness, raft_margin, raft_surface_margin | RB_/RG_/RS_/R2_ fields, RB_Height (= RaftPlatformGap), RB_RG_Enlarge, RS_Enlarge |
+| raft_airgap, layer_0_z_overlap | FL_ModelSpace, FL_SecondLayerLower |
+| raft_interface_thickness, raft_surface_thickness | RB_RaftDefaultHeight |
 | support_angle, support_xy_distance, support_z_distance, support_line_distance, speed_support(_interface) | 90 − SB_DefaultAngle, XyGap, ZGap × layer, SB_InfillIncrement, SB_Speed, SS_InfillSpeed |
 | material_shrinkage_percentage_xy | 100 + ShrinkageCompensation (assumed %; verify) |
 
 ## Not portable (CuraEngine has no equivalent)
-- Per-feature *feed* ratios (`*_Feed`, mm³ per mm): Cura derives flow from line width; tune with `material_flow` if prints are over/under-extruded.
+- Per-feature *feed* (`*_Feed`, mm of filament per mm of path): not mapped yet. Z-Suite extrudes about 10% more on walls and about 50% more on infill lines than Cura's line-width-based flow (see `cube-comparison.md`). Cura's per-feature flow settings (`wall_0_material_flow`, `infill_material_flow`, …) could carry these.
 - Contour entrance/exit moves, contour cutting (`ContourEntrance*`, `CutContour*`).
 - Z-Suite's "visible/invisible" infill distinction and small-area infill (`VTS_*`, `VBS_*`).
 - Support pyramid / lite / hybrid modes (`SB_Pyramid*`, `SUPPORT_LITE`).
