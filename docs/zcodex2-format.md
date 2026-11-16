@@ -80,3 +80,7 @@ Z-Suite sends the ASCII probe `Zortrax` to each interface's subnet broadcast add
 ### FTP delete quirk
 
 The M200 Plus (firmware 2.6.15) answers `DELE` with `450 Can't delete file …` even though the file is removed. The client treats a 4xx reply as success when a directory listing shows the file is gone.
+
+### Lights read-back
+
+Z-Suite sends `setSetting` with `lights` = `off` / `white` / `dynamic` and trusts the reply status; it never reads the value back. On the M200 Plus the lights can change while `getSetting` still reports the old value, so Zura no longer treats a mismatched read-back as an error.
