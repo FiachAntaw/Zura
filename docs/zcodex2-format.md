@@ -81,6 +81,6 @@ Z-Suite sends the ASCII probe `Zortrax` to each interface's subnet broadcast add
 
 The M200 Plus (firmware 2.6.15) answers `DELE` with `450 Can't delete file …` even though the file is removed. The client treats a 4xx reply as success when a directory listing shows the file is gone.
 
-### Lights read-back
+### Lights
 
-Z-Suite sends `setSetting` with `lights` = `off` / `white` / `dynamic` and trusts the reply status; it never reads the value back. On the M200 Plus the lights can change while `getSetting` still reports the old value, so Zura no longer treats a mismatched read-back as an error.
+Z-Suite 3.7 sends `setSetting` with `lights` = `off` / `white` / `dynamic`, but its printer Settings tab (the only place that calls it) is commented out. On the M200 Plus (firmware 2.6.15) the command returns status 1 while the lights stay unchanged and `getSetting` keeps reporting `off`, so Zura doesn't offer a lights control. The LAN client still verifies by read-back and reports a mismatch.

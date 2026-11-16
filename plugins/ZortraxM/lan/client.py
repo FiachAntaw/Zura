@@ -174,19 +174,18 @@ class PrinterClient:
             raise ValueError('Setting values must be finite JSON scalars')
         result = self.request([{'type': 'setSetting', 'settings': [{'name': name, 'value': value}]}])[0]
         if name == 'lights':
-            # Z-Suite trusts the setSetting status and never reads lights back. On a real
-            # M200 Plus (firmware 2.6.15) the lights changed while getSetting still
-            # reported the old value, so the read-back is informational only.
-            result['verified_value'] = None
-            for attempt in range(4):
-                time.sleep(0.5)
-                try:
-                    actual = fields(self.get_settings(['lights'])).get('lights')
-                except PrinterError:
-                    break
+            # An outer status=1 can accompany an unapplied individual setting (the M200 Plus,
+            # firmware 2.6.15, answers 1 and leaves its lights unchanged). Read back the
+            # actual state; never retry the mutation blindly.
+            actual = None
+            for attempt in range(3):
+                if attempt:
+                    time.sleep(0.3)
+                actual = fields(self.get_settings(['lights'])).get('lights')
                 if actual == value:
                     result['verified_value'] = actual
-                    break
+                    return result
+            raise PrinterError(f'Printer did not confirm lights change: requested {value!r}, reported {actual!r}')
         return result
 
     def print_file(self, path, forced=False):

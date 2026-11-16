@@ -243,21 +243,8 @@ Component
                             onClicked: abortConfirm.open()
                         }
                     }
-                    Row
-                    {
-                        spacing: UM.Theme.getSize("narrow_margin").width
-                        UM.Label { anchors.verticalCenter: parent.verticalCenter; text: catalog.i18nc("@label", "Lights") ; width: 60 * screenScaleFactor }
-                        Repeater
-                        {
-                            model: [["off", catalog.i18nc("@action:button", "Off")], ["white", catalog.i18nc("@action:button", "White")], ["dynamic", catalog.i18nc("@action:button", "Dynamic")]]
-                            Cura.SecondaryButton
-                            {
-                                text: modelData[1]
-                                enabled: reachable
-                                onClicked: device.setLights(modelData[0])
-                            }
-                        }
-                    }
+                    // No lights control: Z-Suite 3.7 has it commented out, and the M200 Plus
+                    // (firmware 2.6.15) acknowledges setSetting lights without changing them.
                 }
             }
         }
