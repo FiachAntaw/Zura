@@ -42,8 +42,12 @@ def material_id(name: str) -> str:
     return "zortrax_" + name.lower().replace(" ", "_").replace("-", "_")
 
 
+QUALITY_SUFFIX = {"High": "", "Normal": "_normal", "Draft": "_draft"}
+QUALITY_RANK = {"High": 0, "Normal": 1, "Draft": 2}
+
+
 def quality_type(layer_id: str, quality: str) -> str:
-    return f"z{layer_id}" + ("" if quality == "High" else "_draft")
+    return f"z{layer_id}" + QUALITY_SUFFIX[quality]
 
 
 def mms(v):  # Z-Suite speeds are mm/min
@@ -64,7 +68,7 @@ def cura_values(cfg: dict, ui: dict, layer_mm: float) -> dict:
         "wall_line_count": cfg["SL_ContourQuantity"],
         "speed_wall_0": mms(cfg["SL_ContourSpeed"]),
         "speed_wall_x": mms(cfg["SL_InnerContourSpeed"]),
-        "outer_inset_first": bool(cfg.get("SL_PrintContoursFromOutside", False)),
+        "inset_direction": "outside_in" if cfg.get("SL_PrintContoursFromOutside", False) else "inside_out",
         # infill / skin
         "speed_infill": mms(cfg["IV_InfillSpeed"]),
         "speed_topbottom": mms(cfg["VT_InfillSpeed"]),
@@ -80,8 +84,10 @@ def cura_values(cfg: dict, ui: dict, layer_mm: float) -> dict:
         "retraction_prime_speed": mms(cfg["R_ForwardSpeed"]),
         "retract_at_layer_change": bool(cfg.get("R_ForceRetractionOnLayerChange", True)),
         # first layer (no raft)
-        "speed_layer_0": mms(cfg["FLNR_ContourSpeed"]),
-        "speed_print_layer_0": mms(cfg["FLNR_InfillSpeed"]),
+        # FLNR_* is Z-Suite's "first layer without raft"; materials that need a raft
+        # (Z-SEMIFLEX) leave it at 0, so fall back to the first-layer-on-raft speeds.
+        "speed_layer_0": mms(cfg["FLNR_ContourSpeed"] or cfg["FL_ContourSpeed"]),
+        "speed_print_layer_0": mms(cfg["FLNR_InfillSpeed"] or cfg["FL_InfillSpeed"]),
         # cooling: Z-Suite autofan ramps from AutofanMaxTimeSpeed (slow layers) to
         # AutofanMinTimeSpeed (fast layers) between AutofanMaxTime and AutofanMinTime seconds.
         "cool_fan_enabled": True,
@@ -296,10 +302,10 @@ def main():
         with open(os.path.join(PROFILES, p["file"])) as f:
             prof = json.load(f)
         name, layer_id, quality = p["material"], p["layer_id"], p["quality"]
-        layer_mm = int(layer_id) / 100.0
+        layer_mm = prof["configuration"]["SliceThickness"]  # Z-SEMIFLEX labels 0.14 but slices at 0.15
         qt = quality_type(layer_id, quality)
         label = quality  # Cura appends the layer height, e.g. "High - 0.2mm"
-        qtypes[qt] = (label, -int(layer_id) - (0 if quality == "High" else 1))
+        qtypes[qt] = (label, -int(layer_id) * 10 - QUALITY_RANK[quality])
         names[material_id(name)] = name
         table[(material_id(name), qt)] = cura_values(prof["configuration"], prof["settings"], layer_mm)
     for vals in table.values():

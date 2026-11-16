@@ -72,7 +72,8 @@ class ZCodex2Writer(MeshWriter):
                 gcode.getvalue().splitlines(),
                 material=material,
                 layer_mm=float(stack.getProperty("layer_height", "value")),
-                quality="Draft" if quality_type.endswith("_draft") else "High",
+                quality=("Draft" if quality_type.endswith("_draft")
+                         else "Normal" if quality_type.endswith("_normal") else "High"),
                 nozzle_mm=float(extruder.getProperty("machine_nozzle_size", "value")),
                 raft=stack.getProperty("adhesion_type", "value") == "raft",
                 printer_name=str(definition.getMetaDataEntry("zortrax_printer_name", "M200 Plus")),

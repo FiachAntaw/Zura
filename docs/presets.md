@@ -6,7 +6,7 @@ Quality types: `z10`, `z15`, `z20`, `z30` (High) and `*_draft` (Draft). Only com
 
 ## Where each setting lives
 
-`tools/gen_presets.py` puts every setting in exactly one Cura container, chosen by what it depends on across all 85 Z-Suite profiles:
+`tools/gen_presets.py` puts every setting in exactly one Cura container, chosen by what it depends on across all 102 Z-Suite profiles:
 
 | Container | File | Holds |
 | --- | --- | --- |
@@ -15,7 +15,7 @@ Quality types: `z10`, `z15`, `z20`, `z30` (High) and `*_draft` (Draft). Only com
 | Global quality | `quality/zortrax_m200_plus/zortrax_m200_plus_global_*.inst.cfg` | Layer-height settings shared by all filaments: layer height, top/bottom layers, infill line width, raft layer counts and margin, support Z gap and angle, and the usual speeds for that layer height. |
 | Material quality | `quality/zortrax_m200_plus/zortrax_m200_plus_zortrax_*_z*.inst.cfg` | Only the exceptions where a filament at a given layer height differs from the material or global value (about 4–5 values per profile). |
 
-Cura resolves them in the order material quality > material > global quality > definition. `tests/cura_e2e/run_cura_dump.sh` resolves every setting for every material × quality in headless Cura; the split was checked to give identical per-extruder values to the earlier flat profiles for all 85 combinations, and an identical toolpath for the test cube.
+Cura resolves them in the order material quality > material > global quality > definition. `tests/cura_e2e/run_cura_dump.sh` resolves every setting for every material × quality in headless Cura; the split was checked to give identical per-extruder values to the earlier flat profiles for all 85 combinations, and an identical toolpath for the test cube. After adding Z-SEMIFLEX (0.14/0.19/0.29 mm) and the 0.30 mm Normal profiles, all 102 combinations were re-checked against the Z-Suite values.
 
 ## Mapped
 | Cura | Z-Suite source |

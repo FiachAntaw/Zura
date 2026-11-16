@@ -30,23 +30,19 @@
             "adhesion_type",
             "bridge_settings_enabled",
             "cool_fan_enabled",
-            "cool_fan_speed_0",
             "infill_pattern",
             "infill_sparse_density",
             "material_final_print_temperature",
             "material_initial_print_temperature",
             "material_shrinkage_percentage_xy",
-            "outer_inset_first",
             "raft_interface_line_spacing",
             "raft_interface_thickness",
-            "raft_surface_line_spacing",
             "raft_surface_margin",
             "raft_surface_thickness",
             "retract_at_layer_change",
             "retraction_combing",
             "retraction_hop_enabled",
             "retraction_min_travel",
-            "speed_travel",
             "support_interface_enable",
             "wall_line_count",
             "z_seam_type"
@@ -147,9 +143,6 @@
         "cool_fan_enabled": {
             "value": true
         },
-        "cool_fan_speed_0": {
-            "value": 0
-        },
         "infill_pattern": {
             "value": "'grid'"
         },
@@ -159,17 +152,11 @@
         "material_shrinkage_percentage_xy": {
             "value": 100.22
         },
-        "outer_inset_first": {
-            "value": true
-        },
         "raft_interface_line_spacing": {
             "value": 1.0
         },
         "raft_interface_thickness": {
             "value": 0.2
-        },
-        "raft_surface_line_spacing": {
-            "value": 0.4
         },
         "raft_surface_margin": {
             "value": 5.0
@@ -188,9 +175,6 @@
         },
         "retraction_min_travel": {
             "value": 2.0
-        },
-        "speed_travel": {
-            "value": 200.0
         },
         "support_interface_enable": {
             "value": true
