@@ -19,6 +19,26 @@ from .ZortraxOutputDevice import ZortraxCameraProvider, ZortraxOutputDevice
 HOST_KEY = "zortrax_host"
 
 
+def _broadcast_addresses() -> list:
+    """Subnet broadcast address of every IPv4 interface that is up, plus 255.255.255.255."""
+    addresses = []
+    try:
+        from PyQt6.QtNetwork import QAbstractSocket, QNetworkInterface
+        flags = QNetworkInterface.InterfaceFlag
+        for iface in QNetworkInterface.allInterfaces():
+            f = iface.flags()
+            if not (f & flags.IsUp) or not (f & flags.IsRunning) or (f & flags.IsLoopBack) or not (f & flags.CanBroadcast):
+                continue
+            for entry in iface.addressEntries():
+                ip, bcast = entry.ip(), entry.broadcast()
+                if ip.protocol() == QAbstractSocket.NetworkLayerProtocol.IPv4Protocol and not bcast.isNull():
+                    addresses.append(bcast.toString())
+    except Exception as e:
+        Logger.log("w", "Could not list network interfaces for Zortrax discovery: %s", e)
+    addresses.append("255.255.255.255")
+    return list(dict.fromkeys(addresses))
+
+
 class ZortraxOutputDevicePlugin(OutputDevicePlugin):
     discoveredDevicesChanged = Signal()
 
@@ -56,7 +76,7 @@ class ZortraxOutputDevicePlugin(OutputDevicePlugin):
 
     def _discover(self) -> None:
         try:
-            found = lan.discover_printers(timeout=3)
+            found = lan.discover_printers(timeout=3, broadcast=_broadcast_addresses())
         except Exception as e:
             Logger.log("w", "Zortrax discovery failed: %s", e)
             found = []

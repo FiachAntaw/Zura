@@ -264,16 +264,36 @@ class PrinterClient:
             return ftp.mkd(path)
 
 
-def discover_printers(timeout: float = 3, broadcast: str = '255.255.255.255') -> list[dict]:
-    """Read-only Zortrax UDP discovery; replies are hardware byte + serial bytes."""
-    address = ipaddress.ip_address(broadcast)
-    if address.version != 4 or not math.isfinite(timeout) or not 0 < timeout <= 30:
+def discover_printers(timeout: float = 3, broadcast='255.255.255.255') -> list[dict]:
+    """Read-only Zortrax UDP discovery; replies are hardware byte + serial bytes.
+
+    Z-Suite sends the probe to each interface's subnet broadcast (e.g. 192.168.1.255)
+    rather than 255.255.255.255, which macOS only sends out of one interface; pass a
+    list of addresses to probe them all from one socket.
+    """
+    addresses = [broadcast] if isinstance(broadcast, str) else list(broadcast)
+    targets = []
+    for a in addresses:
+        address = ipaddress.ip_address(a)
+        if address.version != 4:
+            raise ValueError('Discovery requires IPv4 broadcast addresses')
+        if str(address) not in targets:
+            targets.append(str(address))
+    if not targets or not math.isfinite(timeout) or not 0 < timeout <= 30:
         raise ValueError('Discovery requires an IPv4 broadcast and timeout in (0, 30] seconds')
     results = {}
     deadline = time.monotonic() + timeout
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as connection:
         connection.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        connection.sendto(b'Zortrax', (str(address), 8001))
+        sent = 0
+        for target in targets:
+            try:
+                connection.sendto(b'Zortrax', (target, 8001))
+                sent += 1
+            except OSError:
+                continue  # e.g. an interface that went away; try the others
+        if not sent:
+            return []
         # Bound incoming datagrams even on a noisy/malicious local network.
         for _ in range(1024):
             remaining = deadline - time.monotonic()
@@ -284,9 +304,9 @@ def discover_printers(timeout: float = 3, broadcast: str = '255.255.255.255') ->
                 data, sender = connection.recvfrom(2048)
             except socket.timeout:
                 break
-            if len(data) != 33:
-                continue
-            serial = data[1:].split(b'\0', 1)[0].decode('ascii', errors='replace')
+            if not 2 <= len(data) <= 64 or data == b'Zortrax':
+                continue  # Z-Suite reads 33 bytes; ignore our own probe echoed back
+            serial = data[1:33].split(b'\0', 1)[0].decode('ascii', errors='replace')
             results[(sender[0], serial)] = {'host': sender[0], 'hardware': data[0], 'serialNumber': serial}
     return list(results.values())
 

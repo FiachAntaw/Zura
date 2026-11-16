@@ -86,7 +86,8 @@ def main():
         while True:
             data, addr = s.recvfrom(64)
             if data == b"Zortrax":
-                s.sendto(bytes([24]) + b"FAKE0001".ljust(32, b"\0"), addr)
+                # The real M200 Plus replies with 10 bytes: hardware byte + unpadded serial.
+                s.sendto(bytes([24]) + b"ZFAKE0001", addr)
     threading.Thread(target=udp, daemon=True).start()
 
     from pyftpdlib.authorizers import DummyAuthorizer

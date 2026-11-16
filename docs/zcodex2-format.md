@@ -72,3 +72,7 @@ Start sequence Z-Suite emits (M200 Plus): `SetAsValue E0, SetBedTemperature, Set
 - `printerStatus` values seen: `idling`, `preparing_for_print`, `heating`, `busy` (homing/calibration), `printing`, `failsafe` (this printer reports failsafe 55/5/5 at the end of every print, a known quirk).
 - `version` replies with typed values: `protocol` 1, `firmware` "2.6.15", `software` 23727, `hardware` 24.
 - FTP `MLSD` works; sizes are strings and `modify` is `YYYYMMDDHHMMSS.mmm`.
+
+### Discovery (UDP 8001)
+
+Z-Suite sends the ASCII probe `Zortrax` to each interface's subnet broadcast address (for example 192.168.1.255) on UDP port 8001 and reads replies into a 33-byte buffer. A real M200 Plus (firmware 2.6.15) answers from port 8001 with only 10 bytes: the hardware byte (0x18 = 24, M200 Plus) followed by the 9-character serial, with no padding. Parse the reply by length, not as a fixed 33-byte record.
