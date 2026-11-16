@@ -76,3 +76,7 @@ Start sequence Z-Suite emits (M200 Plus): `SetAsValue E0, SetBedTemperature, Set
 ### Discovery (UDP 8001)
 
 Z-Suite sends the ASCII probe `Zortrax` to each interface's subnet broadcast address (for example 192.168.1.255) on UDP port 8001 and reads replies into a 33-byte buffer. A real M200 Plus (firmware 2.6.15) answers from port 8001 with only 10 bytes: the hardware byte (0x18 = 24, M200 Plus) followed by the 9-character serial, with no padding. Parse the reply by length, not as a fixed 33-byte record.
+
+### FTP delete quirk
+
+The M200 Plus (firmware 2.6.15) answers `DELE` with `450 Can't delete file …` even though the file is removed. The client treats a 4xx reply as success when a directory listing shows the file is gone.

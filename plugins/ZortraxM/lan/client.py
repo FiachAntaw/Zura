@@ -256,7 +256,19 @@ class PrinterClient:
         if path == '/':
             raise ValueError('Cannot delete root')
         with self._ftp() as ftp:
-            return ftp.rmd(path) if directory else ftp.delete(path)
+            try:
+                return ftp.rmd(path) if directory else ftp.delete(path)
+            except ftplib.error_temp as e:
+                # The M200 Plus (firmware 2.6.15) deletes the file but still answers
+                # "450 Can't delete file". Only report failure if it is really still there.
+                parent, name = path.rsplit('/', 1)
+                try:
+                    remaining = [n.rsplit('/', 1)[-1] for n in ftp.nlst(parent or '/')]
+                except ftplib.all_errors:
+                    raise e
+                if name in remaining:
+                    raise
+                return str(e)
 
     def mkdir(self, path):
         path = remote_path(path)
