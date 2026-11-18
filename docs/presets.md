@@ -52,11 +52,13 @@ Cura resolves them in the order material quality > material > global quality > d
 - Z-SEMIFLEX: no valid profile was produced by the headless extraction.
 - Only the 0.4 mm nozzle exists in Z-Suite for the M200 Plus.
 
-## Original M200 (Z-Suite 2.32)
+## Original M200 and M300 (Z-Suite 2.32)
 
-`tools/gen_m200_presets.py` builds the `zortrax_m200` machine from Z-Suite 2.32's classic M200 configurations (0.4 mm nozzle, Standard infill, the 10 Zortrax filaments Z-Suite offers for it: 79 profiles in `plugins/ZortraxM/zsuite_profiles_m200/`). Layers are 0.09/0.14/0.19/0.29/0.39 mm (sliced at 0.10/0.15/0.20/0.30/0.39), quality types `z9` … `z39_normal`.
+`tools/gen_classic_presets.py` builds the `zortrax_m200` machine from Z-Suite 2.32's classic M200 configurations (0.4 mm nozzle, Standard infill, the 10 Zortrax filaments Z-Suite offers for it: 79 profiles in `plugins/ZortraxM/zsuite_profiles_m200/`). Layers are 0.09/0.14/0.19/0.29/0.39 mm (sliced at 0.10/0.15/0.20/0.30/0.39), quality types `z9` … `z39_normal`.
 
 The material files are shared with the Plus printers, so every M200 value that depends on the filament goes in the M200's material-specific quality profiles, which outrank the material file; settings that are the same for all 79 profiles go in `definitions/zortrax_m200.def.json`. The classic keys differ from 3.7's: inner wall speed and flow come from `IV_Contour*`, retraction from `R_Back`, raft margin from `RS_ContourOffset`, support angle from `SB_Angle`, and first-layer speeds from `FL_*` (the classic M200 always prints on a raft). Classic Z-Suite prints two walls. Fan: 20% for the first layers, then off for most filaments (autofan disabled), a fixed speed or Z-Suite's layer-time ramp where its profile enables autofan; the raft runs at 30%.
 
-All 79 combinations were resolved in headless Cura and match the generator's values exactly.
+The same generator builds `zortrax_m300` from Z-Suite 2.32's M300 configurations: 7 Zortrax filaments (Z-ULTRAT, Z-GLASS, Z-HIPS, Z-PETG, Z-ESD, Z-PLA Pro, Z-ASA Pro; Z-Suite has no Z-ABS or Z-PCABS profiles for it), 54 profiles in `plugins/ZortraxM/zsuite_profiles_m300/`.
+
+All 79 M200 and 54 M300 combinations were resolved in headless Cura and match the generator's values exactly.
 

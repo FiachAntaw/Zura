@@ -1,6 +1,6 @@
-# Classic .zcode (original Zortrax M200): working notes
+# Classic .zcode (original Zortrax M200 and M300): working notes
 
-The original M200 (no "Plus") prints `.zcode` files from an SD card. Z-Suite 2.32.0 is the last release that writes them; everything below comes from its `Zortrax.Classic.ZCode` / `Zortrax.Classic.GCode` assemblies, and `zcodex/classic.py` reproduces its compiler byte for byte (`tests/fixtures/zsuite232-classic-cube20.zcode` was written by Z-Suite's own `BinaryZCodeFile` from `zsuite232-classic-cube20.gcode`).
+The original M200 and M300 (no "Plus") print `.zcode` files from an SD card. Z-Suite 2.32.0 is the last release that writes them; everything below comes from its `Zortrax.Classic.ZCode` / `Zortrax.Classic.GCode` assemblies, and `zcodex/classic.py` reproduces its compiler byte for byte (`tests/fixtures/zsuite232-classic-cube20.zcode` was written by Z-Suite's own `BinaryZCodeFile` from `zsuite232-classic-cube20.gcode`).
 
 ## File layout
 
@@ -10,7 +10,9 @@ The original M200 (no "Plus") prints `.zcode` files from an SD card. Z-Suite 2.3
 | Commands | `[len][op][args][crc8]`, the same framing and opcodes as ZCodeData, but distances in motor steps rather than micrometres. Every Z move also carries Z2 (791 steps/mm). No PRINT_JUMP: travel is a PRINT_MOVE tagged Jump (252). |
 | Configuration | Z-Suite's Configuration as JSON, encrypted exactly like `.zcodex2`'s ConfigurationData, split into CUSTOM_DATA (18) records of 253 bytes after the counted commands. The printer stops at the command count; Z-Suite reads it back when the file is reopened. |
 
-Minimum firmware: 0.0.8, Z-ESD 1.0.6, Z-PLA Pro and Z-ASA Pro 1.1.1 (Z-Suite's M200 FirmwareControl).
+Minimum firmware: M200 0.0.8, M300 1.0.3; Z-ESD 1.0.6, Z-PLA Pro and Z-ASA Pro 1.1.1 (Z-Suite's FirmwareControl per printer).
+
+The M300 differs only in the header and steps: hardware version 20, Z2 at 800 steps/mm (same as Z), 300 × 300 × 300 mm. Z-Suite generates its G-code with the same M200 code path (`M300GCodeOrder` derives from `M200GCodeOrder`, same fan mover), and its profiles match the M200's apart from a slower travel speed (66.7 vs 90 mm/s).
 
 ## Command stream
 
@@ -28,4 +30,4 @@ Pauses are a PAUSE command (layer number, height in whole mm) right after that l
 
 ## How Zura writes it
 
-`zcodex/classic_gcode.py` rewrites Cura's G-code into that dialect (Cura's start/end G-code and priming are replaced by Z-Suite's sequence; Cura's ;TYPE becomes the area; Cura's raft layers become Raft, RaftBottom, RaftBottomSmall and RaftInterface like Z-Suite's), compiles it with `classic.py`, then adds progress (from Cura's TIME_ELAPSED comments) and moves the fan commands. Because Cura doesn't always retract between layers, Zura also resets E at every layer. The header ids and the embedded configuration come from the bundled Z-Suite 2.32 profile for the chosen material, layer and quality (`plugins/ZortraxM/zsuite_profiles_m200/`).
+`zcodex/classic_gcode.py` rewrites Cura's G-code into that dialect (Cura's start/end G-code and priming are replaced by Z-Suite's sequence; Cura's ;TYPE becomes the area; Cura's raft layers become Raft, RaftBottom, RaftBottomSmall and RaftInterface like Z-Suite's), compiles it with `classic.py`, then adds progress (from Cura's TIME_ELAPSED comments) and moves the fan commands. Because Cura doesn't always retract between layers, Zura also resets E at every layer. The header ids and the embedded configuration come from the bundled Z-Suite 2.32 profile for the chosen material, layer and quality (`plugins/ZortraxM/zsuite_profiles_m200/` and `zsuite_profiles_m300/`).

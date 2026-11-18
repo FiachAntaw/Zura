@@ -1,15 +1,16 @@
-"""Generate the original Zortrax M200 machine, its quality profiles and its bundled Z-Suite configs.
+"""Generate the original Zortrax M200 and M300 machines, their quality profiles and bundled Z-Suite configs.
 
-Input:  Z-Suite 2.32 "classic" M200 configurations dumped with tools/dotnet (zcref configs <dir>),
-        default /tmp/claude-0/m200cfg (index.json + one JSON per material/nozzle/layer/quality/infill).
-        Once copied, plugins/ZortraxM/zsuite_profiles_m200/ is the source and the dump is optional.
-Output: plugins/ZortraxM/zsuite_profiles_m200/*.json (0.4 mm nozzle, Standard infill, Zortrax materials)
-        plugins/ZortraxM/resources/definitions/zortrax_m200.def.json
-        plugins/ZortraxM/resources/extruders/zortrax_m200_extruder_0.def.json
-        plugins/ZortraxM/resources/quality/zortrax_m200/*.inst.cfg
+Input:  Z-Suite 2.32 "classic" configurations dumped with tools/dotnet (ZC_PRINTER=M200|M300 zcref configs <dir>),
+        default /tmp/claude-0/m200cfg and /tmp/claude-0/m300cfg (index.json + one JSON per combination).
+        Once copied, plugins/ZortraxM/zsuite_profiles_<m200|m300>/ is the source and the dump is optional.
+Output, per machine (zortrax_m200, zortrax_m300):
+        plugins/ZortraxM/zsuite_profiles_<model>/*.json (0.4 mm nozzle, Standard infill, Zortrax materials)
+        plugins/ZortraxM/resources/definitions/<machine>.def.json
+        plugins/ZortraxM/resources/extruders/<machine>_extruder_0.def.json
+        plugins/ZortraxM/resources/quality/<machine>/*.inst.cfg
 
-Run: python3 tools/gen_m200_presets.py [dump_dir]
-Material files are shared with the Plus printers: run tools/gen_presets.py first (it lists the M200 in them).
+Run: python3 tools/gen_classic_presets.py [m200|m300 dump_dir]
+Material files are shared with the Plus printers: run tools/gen_presets.py first (it lists these machines in them).
 """
 import copy
 import json
@@ -21,14 +22,33 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gen_presets as G  # noqa: E402
 
-MACHINE = "zortrax_m200"
-PROFILES = os.path.join(G.PLUGIN, "zsuite_profiles_m200")
-Q_DIR = os.path.join(G.RES, "quality", MACHINE)
-DEFINITION = os.path.join(G.RES, "definitions", f"{MACHINE}.def.json")
-EXTRUDER = os.path.join(G.RES, "extruders", f"{MACHINE}_extruder_0.def.json")
-# Zortrax filaments Z-Suite 2.32 offers for the M200 (ids 129+ are its generic "-based filament" profiles).
-MATERIALS = ("Z-ABS", "Z-ABS 2", "Z-ULTRAT", "Z-GLASS", "Z-HIPS", "Z-PCABS", "Z-PETG", "Z-ESD", "Z-PLA Pro", "Z-ASA Pro")
+# Zortrax filaments Z-Suite 2.32 offers for each printer (ids 129+ are its generic "-based filament" profiles).
+CLASSIC = {
+    "m200": {"machine": "zortrax_m200", "name": "Zortrax M200", "short": "M200", "hardware": 1, "size": 200,
+             "height": 180, "platform": "zortrax_m200_plus_platform.stl", "preferred_material": "zortrax_z_abs",
+             "materials": ("Z-ABS", "Z-ABS 2", "Z-ULTRAT", "Z-GLASS", "Z-HIPS", "Z-PCABS", "Z-PETG", "Z-ESD",
+                           "Z-PLA Pro", "Z-ASA Pro")},
+    "m300": {"machine": "zortrax_m300", "name": "Zortrax M300", "short": "M300", "hardware": 20, "size": 300,
+             "height": 300, "platform": "zortrax_m300_plus_platform.stl", "preferred_material": "zortrax_z_ultrat",
+             "materials": ("Z-ULTRAT", "Z-GLASS", "Z-HIPS", "Z-PETG", "Z-ESD", "Z-PLA Pro", "Z-ASA Pro")},
+}
 QUALITY_FIX = {("Z-ULTRAT", "29"): "Normal"}  # Z-Suite labels it Normal (quality id 1, the only one at 0.29)
+
+MODEL = MACHINE = PROFILES = Q_DIR = DEFINITION = EXTRUDER = MATERIALS = SPEC = None
+
+
+def select(model: str) -> None:
+    """Point the module-level paths at one classic printer."""
+    global MODEL, MACHINE, PROFILES, Q_DIR, DEFINITION, EXTRUDER, MATERIALS, SPEC
+    SPEC = CLASSIC[model]
+    MODEL, MACHINE, MATERIALS = model, SPEC["machine"], SPEC["materials"]
+    PROFILES = os.path.join(G.PLUGIN, f"zsuite_profiles_{model}")
+    Q_DIR = os.path.join(G.RES, "quality", MACHINE)
+    DEFINITION = os.path.join(G.RES, "definitions", f"{MACHINE}.def.json")
+    EXTRUDER = os.path.join(G.RES, "extruders", f"{MACHINE}_extruder_0.def.json")
+
+
+select("m200")
 
 
 def import_dump(dump: str) -> None:
@@ -52,7 +72,7 @@ def import_dump(dump: str) -> None:
                     "infill_id": int(p["infill_id"]), "nozzle_id": int(p["nozzle_id"])})
     out.sort(key=lambda p: (p["material"], int(p["layer_id"]), G.QUALITY_RANK[p["quality"]]))
     with open(os.path.join(PROFILES, "index.json"), "w") as f:
-        json.dump({"source": "Z-Suite 2.32.0 (Zortrax M200, 0.4 mm nozzle, Standard infill)", "profiles": out}, f, indent=1)
+        json.dump({"source": f"Z-Suite 2.32.0 ({SPEC['name']}, 0.4 mm nozzle, Standard infill)", "profiles": out}, f, indent=1)
     print(f"imported {len(out)} configurations")
 
 
@@ -151,22 +171,27 @@ def write_definition(const: dict) -> None:
     o = d["overrides"]
     for k in d["metadata"].pop("zura_generated_overrides", []):
         o.pop(k, None)
-    d["name"] = "Zortrax M200"
+    d["name"] = SPEC["name"]
     md = d["metadata"]
     md.update({
         "file_formats": "application/x-zortrax-zcode",
         "preferred_quality_type": "z19",
-        "supported_actions": ["MachineSettingsAction"],  # no network on the original M200: print from SD card
+        "supported_actions": ["MachineSettingsAction"],  # no network on the original M200/M300: print from SD card
         "machine_extruder_trains": {"0": f"{MACHINE}_extruder_0"},
-        "zortrax_printer_name": "M200",
-        "zortrax_hardware_version": 1,
-        # Cura matches these as substrings of material container ids, so name the M200-specific containers
+        "platform": SPEC["platform"],
+        "preferred_material": SPEC["preferred_material"],
+        "zortrax_printer_name": SPEC["short"],
+        "zortrax_hardware_version": SPEC["hardware"],
+        # Cura matches these as substrings of material container ids, so name the printer-specific containers
         # ("zortrax_z_pla" alone would also hide zortrax_z_pla_pro).
         "exclude_materials": sorted(f"{G.material_id(n)}_{MACHINE}" for n in G.MATERIALS if n not in MATERIALS),
     })
     for k in ("zortrax_printer_model_id", "zortrax_min_firmware"):
         md.pop(k, None)
-    o["machine_name"] = {"default_value": "Zortrax M200"}
+    o["machine_name"] = {"default_value": SPEC["name"]}
+    o["machine_width"] = {"default_value": SPEC["size"]}
+    o["machine_depth"] = {"default_value": SPEC["size"]}
+    o["machine_height"] = {"default_value": SPEC["height"]}
     o["machine_start_gcode"] = {"default_value": (
         "; The Zortrax start sequence (heating, homing) is added automatically when the print is saved as .zcode.\n"
         "; Only temperature (M104/M109/M140/M190) and fan (M106/M107) commands here are used.\n"
@@ -196,8 +221,17 @@ def inst_cfg(name, qtype, weight, values, material=None) -> str:
 
 
 def main():
-    if len(sys.argv) > 1 or not os.path.isdir(PROFILES):
-        import_dump(sys.argv[1] if len(sys.argv) > 1 else "/tmp/claude-0/m200cfg")
+    dumps = {"m200": "/tmp/claude-0/m200cfg", "m300": "/tmp/claude-0/m300cfg"}
+    if len(sys.argv) > 2:
+        dumps = {sys.argv[1]: sys.argv[2]}
+    for model in CLASSIC:
+        select(model)
+        if len(sys.argv) > 2 and model in dumps or not os.path.isdir(PROFILES):
+            import_dump(dumps[model])
+        generate()
+
+
+def generate():
     with open(os.path.join(PROFILES, "index.json")) as f:
         index = json.load(f)["profiles"]
     os.makedirs(Q_DIR, exist_ok=True)
@@ -228,7 +262,7 @@ def main():
         rest = {k: v for k, v in vals.items() if k not in const}
         with open(os.path.join(Q_DIR, f"{MACHINE}_{mid}_{qt}.inst.cfg"), "w") as f:
             f.write(inst_cfg(label, qt, weight, rest, material=mid))
-    print(f"{len(table)} material profiles, {len(qtypes)} quality types; constant: {', '.join(sorted(const))}")
+    print(f"{MACHINE}: {len(table)} material profiles, {len(qtypes)} quality types; constant: {', '.join(sorted(const))}")
 
 
 if __name__ == "__main__":

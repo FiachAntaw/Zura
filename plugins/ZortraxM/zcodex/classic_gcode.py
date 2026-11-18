@@ -27,7 +27,14 @@ from . import classic
 from . import commands as C
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PROFILE_DIR = os.path.join(os.path.dirname(HERE), "zsuite_profiles_m200")
+PLUGIN_DIR = os.path.dirname(HERE)
+# The classic printers Z-Suite 2.32 supports (Zortrax.Classic.Printers M200Printer / M300Printer).
+PRINTERS = {
+    "zortrax_m200": {"profiles": "zsuite_profiles_m200", "hardware": 1, "base_fw": (0, 0, 8),
+                     "steps": {"X": 640, "Y": 640, "Z": 800, "Z2": 791, "E": 960}},
+    "zortrax_m300": {"profiles": "zsuite_profiles_m300", "hardware": 20, "base_fw": (1, 0, 3),
+                     "steps": {"X": 640, "Y": 640, "Z": 800, "Z2": 800, "E": 960}},
+}
 
 TYPE_AREA = {
     "WALL-OUTER": "ModelContour",
@@ -63,6 +70,7 @@ class Options:
     raft_bottom_layers: int = 1   # Z-Suite's R2 layers (printed right after the base as RaftBottom)
     retract_mm: float = 0.8
     max_z_mm: float = 180.0
+    steps: dict = field(default_factory=lambda: dict(classic.STEPS_M200))
 
 
 @dataclass
@@ -345,7 +353,7 @@ class Translator:
             if ";<raft:" in item:
                 idx = int(item.split(";<raft:")[1].rstrip(">"))
                 item = item.split(";<raft:")[0] + f";<{raft_area.get(idx, 'Raft')}>"
-            cmds.extend(classic.compile_line(item))
+            cmds.extend(classic.compile_line(item, self.o.steps))
         cmds = move_fan_commands(cmds)
         cmds.append(C.report_progress(100))
         return Result(commands=cmds, raft_layers=len(raft), model_layers=len(model),
@@ -400,38 +408,39 @@ def translate(lines: Iterable[str], options: Optional[Options] = None) -> Result
 
 
 # -- profiles and the complete file ------------------------------------------------
-def load_index() -> list:
-    with open(os.path.join(PROFILE_DIR, "index.json")) as f:
+def load_index(machine: str = "zortrax_m200") -> list:
+    with open(os.path.join(PLUGIN_DIR, PRINTERS[machine]["profiles"], "index.json")) as f:
         return json.load(f)["profiles"]
 
 
-def load_profile(material: str, layer_id: str, quality: str):
-    """(index entry, Configuration) for the closest bundled Z-Suite 2.32 M200 profile."""
-    index = load_index()
-    candidates = [p for p in index if p["material"] == material] or [p for p in index if p["material"] == "Z-ABS"]
+def load_profile(material: str, layer_id: str, quality: str, machine: str = "zortrax_m200"):
+    """(index entry, Configuration) for the closest bundled Z-Suite 2.32 profile."""
+    index = load_index(machine)
+    candidates = [p for p in index if p["material"] == material] or [p for p in index if p["material"] == index[0]["material"]]
     candidates.sort(key=lambda p: (abs(int(p["layer_id"]) - int(layer_id)), p["quality"] != quality))
     entry = candidates[0]
-    with open(os.path.join(PROFILE_DIR, entry["file"])) as f:
+    with open(os.path.join(PLUGIN_DIR, PRINTERS[machine]["profiles"], entry["file"])) as f:
         return entry, json.load(f, object_pairs_hook=OrderedDict)
 
 
-def min_firmware(material_id: int) -> tuple:
-    """Z-Suite 2.32's M200 FirmwareControl: 0.0.8, Z-ESD 1.0.6, Z-PLA Pro / Z-ASA Pro 1.1.1."""
+def min_firmware(material_id: int, machine: str = "zortrax_m200") -> tuple:
+    """Z-Suite 2.32's FirmwareControl: M200 0.0.8 / M300 1.0.3, Z-ESD 1.0.6, Z-PLA Pro / Z-ASA Pro 1.1.1."""
     if material_id in (11, 12):
         return (1, 1, 1)
     if material_id == 8:
-        return (1, 0, 6)
-    return (0, 0, 8)
+        return max((1, 0, 6), PRINTERS[machine]["base_fw"])
+    return PRINTERS[machine]["base_fw"]
 
 
 def build(gcode: Iterable[str], *, material: str = "Z-ABS", layer_id: str = "19", quality: str = "High",
-          support_angle: Optional[float] = None, max_z_mm: float = 180.0) -> bytes:
+          support_angle: Optional[float] = None, max_z_mm: float = 180.0, machine: str = "zortrax_m200") -> bytes:
     """Cura G-code -> complete .zcode bytes. support_angle is Z-Suite's angle (None = no supports)."""
-    entry, cfg = load_profile(material, layer_id, quality)
+    printer = PRINTERS[machine]
+    entry, cfg = load_profile(material, layer_id, quality, machine)
     opts = Options(bed_temperature=cfg["TempBed"], nozzle_temperature=cfg["TempExtruder"],
                    raft_surface_layers=cfg.get("RS_Quantity", 2), raft_bottom_layers=cfg.get("R2_Quantity", 1),
                    retract_mm=float(cfg.get("R_Back", 0.8)),
-                   max_z_mm=max_z_mm)
+                   max_z_mm=max_z_mm, steps=dict(printer["steps"]))
     result = translate(gcode, opts)
     cfg["TempExtruder"] = result.nozzle_temperature
     cfg["TempBed"] = result.bed_temperature
@@ -440,7 +449,9 @@ def build(gcode: Iterable[str], *, material: str = "Z-ABS", layer_id: str = "19"
     header = classic.Header(
         command_count=len(result.commands),
         print_time=result.print_time_s,
-        min_fw=min_firmware(entry["material_id"]),
+        min_fw=min_firmware(entry["material_id"], machine),
+        steps=dict(printer["steps"]),
+        hardware_version=printer["hardware"],
         printing_profile=entry["material_id"],
         layer_thickness=int(entry["layer_id"]),
         quality=entry["quality_id"],

@@ -56,7 +56,7 @@ def _quality_name(quality_type: str) -> str:
 
 
 class ZCodex2Writer(MeshWriter):
-    """Writes Cura's sliced G-code as a Zortrax .zcodex2 file (Plus printers) or .zcode file (original M200)."""
+    """Writes Cura's sliced G-code as a Zortrax .zcodex2 file (Plus printers) or .zcode file (original M200/M300)."""
 
     def __init__(self) -> None:
         super().__init__(add_to_recent_files=False)
@@ -114,6 +114,7 @@ class ZCodex2Writer(MeshWriter):
                 quality=_quality_name(quality_type),
                 support_angle=(90 - float(stack.getProperty("support_angle", "value"))) if support else None,
                 max_z_mm=float(stack.getProperty("machine_height", "value")),
+                machine=stack.definition.getId() if stack.definition.getId() in classic_gcode.PRINTERS else "zortrax_m200",
             )
         except Exception as e:
             Logger.logException("e", "Failed to build zcode")

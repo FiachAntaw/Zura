@@ -43,6 +43,7 @@
             <machine_identifier manufacturer="Zortrax" product="zortrax_m200_plus" />
             <machine_identifier manufacturer="Zortrax" product="zortrax_m300_plus" />
             <machine_identifier manufacturer="Zortrax" product="zortrax_m200" />
+            <machine_identifier manufacturer="Zortrax" product="zortrax_m300" />
             <setting key="hardware compatible">yes</setting>
         </machine>
     </settings>

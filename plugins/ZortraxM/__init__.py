@@ -17,7 +17,7 @@ MimeTypeDatabase.addMimeType(MimeType(
 
 MimeTypeDatabase.addMimeType(MimeType(
     name="application/x-zortrax-zcode",
-    comment="Zortrax ZCode (M200)",
+    comment="Zortrax ZCode (M200/M300)",
     suffixes=["zcode"],
 ))
 
@@ -35,7 +35,7 @@ def getMetaData():
                 "mode": ZCodex2Writer.ZCodex2Writer.OutputMode.BinaryMode,
             }, {
                 "extension": "zcode",
-                "description": "Zortrax ZCode file (M200)",
+                "description": "Zortrax ZCode file (M200/M300)",
                 "mime_type": "application/x-zortrax-zcode",
                 "mode": ZCodex2Writer.ZCodex2Writer.OutputMode.BinaryMode,
             }]

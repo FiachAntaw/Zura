@@ -134,6 +134,17 @@ class ClassicZCodeTests(unittest.TestCase):
         temps = [a for op, a in body if op == C.Op.SET_EXTRUDER_TEMPERATURE]
         self.assertEqual(struct.unpack("<Bi", temps[0]), (0, 207))
 
+    def test_m300_header_and_steps(self):
+        from zcodex import classic, classic_gcode
+        lines = _read("cura514-e2e-m200-cube20.gcode", "r").splitlines()
+        data = classic_gcode.build(lines, material="Z-HIPS", layer_id="19", quality="High",
+                                   machine="zortrax_m300", max_z_mm=300)
+        fields, cmds = classic.read(data)
+        self.assertEqual(fields["steps"], (640, 640, 800, 960, 1, 1, 800, 0))
+        self.assertEqual((fields["hardware_version"], fields["min_fw"], fields["printing_profile"]), (20, (1, 0, 3), 3))
+        z = [C.decode_axes(a[1:]) for op, a in cmds if op == C.Op.PRINT_MOVE and C.decode_axes(a[1:]).get("Z")]
+        self.assertTrue(all(m["Z"] == m["Z2"] for m in z))  # the M300's second Z motor has the same steps
+
     def test_fan_commands_move_15_moves_later(self):
         from zcodex.classic_gcode import move_fan_commands
         fan = C.print_move(255, fan2=255)
