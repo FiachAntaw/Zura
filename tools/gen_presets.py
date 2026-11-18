@@ -18,7 +18,7 @@ RES = os.path.join(PLUGIN, "resources")
 MACHINE = "zortrax_m200_plus"
 # The M300 Plus uses the same Z-Suite profiles (only the unused waste-tower position differs), so it shares
 # the M200 Plus quality profiles via quality_definition and is listed in every material file.
-MATERIAL_MACHINES = ("zortrax_m200_plus", "zortrax_m300_plus")
+MATERIAL_MACHINES = ("zortrax_m200_plus", "zortrax_m300_plus", "zortrax_m200")
 SETTING_VERSION = 27  # Cura 5.14
 NS = uuid.UUID("6f1b9a4e-2a1d-4c3e-9b0e-5a7d3c2e1f00")
 

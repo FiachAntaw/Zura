@@ -8,7 +8,11 @@ from UM.i18n import i18nCatalog
 
 from cura.CuraApplication import CuraApplication
 
+from .zcodex import classic_gcode
 from .zcodex import writer as zwriter
+
+ZCODEX2_MIME = "application/x-zortrax-zcodex2"
+ZCODE_MIME = "application/x-zortrax-zcode"
 
 catalog = i18nCatalog("cura")
 
@@ -46,15 +50,20 @@ def _preview_png() -> bytes:
         return b""
 
 
+def _quality_name(quality_type: str) -> str:
+    return ("Draft" if quality_type.endswith("_draft")
+            else "Normal" if quality_type.endswith("_normal") else "High")
+
+
 class ZCodex2Writer(MeshWriter):
-    """Writes Cura's sliced G-code as a Zortrax .zcodex2 file."""
+    """Writes Cura's sliced G-code as a Zortrax .zcodex2 file (Plus printers) or .zcode file (original M200)."""
 
     def __init__(self) -> None:
         super().__init__(add_to_recent_files=False)
 
-    def write(self, stream, nodes, mode=MeshWriter.OutputMode.BinaryMode) -> bool:
+    def write(self, stream, nodes, mode=MeshWriter.OutputMode.BinaryMode, **kwargs) -> bool:
         if mode != MeshWriter.OutputMode.BinaryMode:
-            self.setInformation(catalog.i18nc("@error", "ZCodex2 writer only supports binary mode."))
+            self.setInformation(catalog.i18nc("@error", "Zortrax writer only supports binary mode."))
             return False
         gcode = StringIO()
         gcode_writer = cast(MeshWriter, PluginRegistry.getInstance().getPluginObject("GCodeWriter"))
@@ -67,13 +76,16 @@ class ZCodex2Writer(MeshWriter):
         material = _material_name(extruder.material.getMetaDataEntry("base_file", extruder.material.getId()))
         definition = stack.definition
         quality_type = stack.quality.getMetaDataEntry("quality_type", "") or ""
+        formats = str(definition.getMetaDataEntry("file_formats", ZCODEX2_MIME)).split(";")
+        mime = kwargs.get("mime_type") or formats[0]
+        if mime == ZCODE_MIME:
+            return self._writeZCode(stream, gcode.getvalue(), stack, material, quality_type)
         try:
             data = zwriter.build(
                 gcode.getvalue().splitlines(),
                 material=material,
                 layer_mm=float(stack.getProperty("layer_height", "value")),
-                quality=("Draft" if quality_type.endswith("_draft")
-                         else "Normal" if quality_type.endswith("_normal") else "High"),
+                quality=_quality_name(quality_type),
                 nozzle_mm=float(extruder.getProperty("machine_nozzle_size", "value")),
                 raft=stack.getProperty("adhesion_type", "value") == "raft",
                 printer_name=str(definition.getMetaDataEntry("zortrax_printer_name", "M200 Plus")),
@@ -85,6 +97,27 @@ class ZCodex2Writer(MeshWriter):
         except Exception as e:
             Logger.logException("e", "Failed to build zcodex2")
             self.setInformation(catalog.i18nc("@error", "Could not create the ZCodex2 file: {0}").format(e))
+            return False
+        stream.write(data)
+        return True
+
+    def _writeZCode(self, stream, gcode: str, stack, material: str, quality_type: str) -> bool:
+        layer_id = quality_type[1:].split("_")[0] if quality_type.startswith("z") else ""
+        if not layer_id.isdigit():  # custom profile without a Zortrax quality: pick by layer height
+            layer_id = str(int(round(float(stack.getProperty("layer_height", "value")) * 100)) - 1)
+        support = bool(stack.getProperty("support_enable", "value"))
+        try:
+            data = classic_gcode.build(
+                gcode.splitlines(),
+                material=material,
+                layer_id=layer_id,
+                quality=_quality_name(quality_type),
+                support_angle=(90 - float(stack.getProperty("support_angle", "value"))) if support else None,
+                max_z_mm=float(stack.getProperty("machine_height", "value")),
+            )
+        except Exception as e:
+            Logger.logException("e", "Failed to build zcode")
+            self.setInformation(catalog.i18nc("@error", "Could not create the .zcode file: {0}").format(e))
             return False
         stream.write(data)
         return True

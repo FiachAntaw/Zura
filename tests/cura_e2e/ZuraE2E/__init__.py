@@ -155,7 +155,7 @@ class E2E(Extension):
         mm = app.getMachineManager()
         reg = app.getContainerRegistry()
         keys = json.loads(os.environ.get("ZURA_E2E_KEYS", "[]"))
-        quals = reg.findInstanceContainersMetadata(type="quality", definition="zortrax_m200_plus")
+        quals = reg.findInstanceContainersMetadata(type="quality", definition=os.environ.get("ZURA_E2E_MACHINE", "zortrax_m200_plus"))
         combos = sorted({(q["material"], q["quality_type"]) for q in quals if q.get("material")})
         out = {}
         for mat_id, qt in combos:
@@ -175,8 +175,8 @@ class E2E(Extension):
         app = CuraApplication.getInstance()
         stack = app.getGlobalContainerStack()
         ext = stack.extruderList[0]
-        mats = app.getContainerRegistry().findInstanceContainersMetadata(type="material", definition="zortrax_m200_plus")
-        quals = app.getContainerRegistry().findInstanceContainersMetadata(type="quality", definition="zortrax_m200_plus")
+        mats = app.getContainerRegistry().findInstanceContainersMetadata(type="material", definition=os.environ.get("ZURA_E2E_MACHINE", "zortrax_m200_plus"))
+        quals = app.getContainerRegistry().findInstanceContainersMetadata(type="quality", definition=os.environ.get("ZURA_E2E_MACHINE", "zortrax_m200_plus"))
         log(json.dumps({"machine": stack.definition.getId(), "material": ext.material.getId(),
                         "quality": stack.quality.getId(), "quality_type": stack.quality.getMetaDataEntry("quality_type"),
                         "layer_height": stack.getProperty("layer_height", "value"),
@@ -186,6 +186,9 @@ class E2E(Extension):
                         "adhesion": stack.getProperty("adhesion_type", "value"),
                         "n_materials": len(mats), "n_quality": len(quals),
                         "material_ids": sorted({m.get("base_file", m["id"]) for m in mats})[:40]}))
+        from cura.Machines.ContainerTree import ContainerTree
+        node = ContainerTree.getInstance().machines[stack.definition.getId()]
+        log("selectable materials: " + ", ".join(sorted({b for v in node.variants.values() for b in v.materials})))
         qm = app.getMachineManager().activeQualityGroups() if hasattr(app.getMachineManager(), "activeQualityGroups") else None
         app.readLocalFile(QUrl.fromLocalFile(STL))
         if os.environ.get("ZURA_E2E_PLATE"):

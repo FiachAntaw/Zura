@@ -1,0 +1,795 @@
+{
+ "source": "Z-Suite 2.32.0 (Zortrax M200, 0.4 mm nozzle, Standard infill)",
+ "profiles": [
+  {
+   "file": "Z-ABS_9_High.json",
+   "material": "Z-ABS",
+   "material_id": 0,
+   "layer_id": "9",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_9_Normal.json",
+   "material": "Z-ABS",
+   "material_id": 0,
+   "layer_id": "9",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_14_High.json",
+   "material": "Z-ABS",
+   "material_id": 0,
+   "layer_id": "14",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_14_Normal.json",
+   "material": "Z-ABS",
+   "material_id": 0,
+   "layer_id": "14",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_14_Draft.json",
+   "material": "Z-ABS",
+   "material_id": 0,
+   "layer_id": "14",
+   "quality": "Draft",
+   "quality_id": 3,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_19_High.json",
+   "material": "Z-ABS",
+   "material_id": 0,
+   "layer_id": "19",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_19_Normal.json",
+   "material": "Z-ABS",
+   "material_id": 0,
+   "layer_id": "19",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_19_Draft.json",
+   "material": "Z-ABS",
+   "material_id": 0,
+   "layer_id": "19",
+   "quality": "Draft",
+   "quality_id": 3,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_29_High.json",
+   "material": "Z-ABS",
+   "material_id": 0,
+   "layer_id": "29",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_29_Normal.json",
+   "material": "Z-ABS",
+   "material_id": 0,
+   "layer_id": "29",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_39_Normal.json",
+   "material": "Z-ABS",
+   "material_id": 0,
+   "layer_id": "39",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_2_9_High.json",
+   "material": "Z-ABS 2",
+   "material_id": 26,
+   "layer_id": "9",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_2_9_Normal.json",
+   "material": "Z-ABS 2",
+   "material_id": 26,
+   "layer_id": "9",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_2_14_High.json",
+   "material": "Z-ABS 2",
+   "material_id": 26,
+   "layer_id": "14",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_2_14_Normal.json",
+   "material": "Z-ABS 2",
+   "material_id": 26,
+   "layer_id": "14",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_2_14_Draft.json",
+   "material": "Z-ABS 2",
+   "material_id": 26,
+   "layer_id": "14",
+   "quality": "Draft",
+   "quality_id": 3,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_2_19_High.json",
+   "material": "Z-ABS 2",
+   "material_id": 26,
+   "layer_id": "19",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_2_19_Normal.json",
+   "material": "Z-ABS 2",
+   "material_id": 26,
+   "layer_id": "19",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_2_19_Draft.json",
+   "material": "Z-ABS 2",
+   "material_id": 26,
+   "layer_id": "19",
+   "quality": "Draft",
+   "quality_id": 3,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_2_29_High.json",
+   "material": "Z-ABS 2",
+   "material_id": 26,
+   "layer_id": "29",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_2_29_Normal.json",
+   "material": "Z-ABS 2",
+   "material_id": 26,
+   "layer_id": "29",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ABS_2_39_Normal.json",
+   "material": "Z-ABS 2",
+   "material_id": 26,
+   "layer_id": "39",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ASA_Pro_9_High.json",
+   "material": "Z-ASA Pro",
+   "material_id": 12,
+   "layer_id": "9",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ASA_Pro_9_Normal.json",
+   "material": "Z-ASA Pro",
+   "material_id": 12,
+   "layer_id": "9",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ASA_Pro_14_High.json",
+   "material": "Z-ASA Pro",
+   "material_id": 12,
+   "layer_id": "14",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ASA_Pro_14_Normal.json",
+   "material": "Z-ASA Pro",
+   "material_id": 12,
+   "layer_id": "14",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ASA_Pro_19_High.json",
+   "material": "Z-ASA Pro",
+   "material_id": 12,
+   "layer_id": "19",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ASA_Pro_19_Normal.json",
+   "material": "Z-ASA Pro",
+   "material_id": 12,
+   "layer_id": "19",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ASA_Pro_29_High.json",
+   "material": "Z-ASA Pro",
+   "material_id": 12,
+   "layer_id": "29",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ASA_Pro_29_Normal.json",
+   "material": "Z-ASA Pro",
+   "material_id": 12,
+   "layer_id": "29",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ESD_9_High.json",
+   "material": "Z-ESD",
+   "material_id": 8,
+   "layer_id": "9",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ESD_9_Normal.json",
+   "material": "Z-ESD",
+   "material_id": 8,
+   "layer_id": "9",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ESD_14_High.json",
+   "material": "Z-ESD",
+   "material_id": 8,
+   "layer_id": "14",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ESD_14_Normal.json",
+   "material": "Z-ESD",
+   "material_id": 8,
+   "layer_id": "14",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ESD_19_High.json",
+   "material": "Z-ESD",
+   "material_id": 8,
+   "layer_id": "19",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ESD_19_Normal.json",
+   "material": "Z-ESD",
+   "material_id": 8,
+   "layer_id": "19",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ESD_19_Draft.json",
+   "material": "Z-ESD",
+   "material_id": 8,
+   "layer_id": "19",
+   "quality": "Draft",
+   "quality_id": 3,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-GLASS_14_High.json",
+   "material": "Z-GLASS",
+   "material_id": 2,
+   "layer_id": "14",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-GLASS_14_Normal.json",
+   "material": "Z-GLASS",
+   "material_id": 2,
+   "layer_id": "14",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-GLASS_19_High.json",
+   "material": "Z-GLASS",
+   "material_id": 2,
+   "layer_id": "19",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-GLASS_19_Normal.json",
+   "material": "Z-GLASS",
+   "material_id": 2,
+   "layer_id": "19",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-HIPS_9_High.json",
+   "material": "Z-HIPS",
+   "material_id": 3,
+   "layer_id": "9",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-HIPS_9_Normal.json",
+   "material": "Z-HIPS",
+   "material_id": 3,
+   "layer_id": "9",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-HIPS_14_High.json",
+   "material": "Z-HIPS",
+   "material_id": 3,
+   "layer_id": "14",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-HIPS_14_Normal.json",
+   "material": "Z-HIPS",
+   "material_id": 3,
+   "layer_id": "14",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-HIPS_14_Draft.json",
+   "material": "Z-HIPS",
+   "material_id": 3,
+   "layer_id": "14",
+   "quality": "Draft",
+   "quality_id": 3,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-HIPS_19_High.json",
+   "material": "Z-HIPS",
+   "material_id": 3,
+   "layer_id": "19",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-HIPS_19_Normal.json",
+   "material": "Z-HIPS",
+   "material_id": 3,
+   "layer_id": "19",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-HIPS_19_Draft.json",
+   "material": "Z-HIPS",
+   "material_id": 3,
+   "layer_id": "19",
+   "quality": "Draft",
+   "quality_id": 3,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-HIPS_29_High.json",
+   "material": "Z-HIPS",
+   "material_id": 3,
+   "layer_id": "29",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-HIPS_29_Normal.json",
+   "material": "Z-HIPS",
+   "material_id": 3,
+   "layer_id": "29",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-HIPS_29_Draft.json",
+   "material": "Z-HIPS",
+   "material_id": 3,
+   "layer_id": "29",
+   "quality": "Draft",
+   "quality_id": 3,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-PCABS_14_High.json",
+   "material": "Z-PCABS",
+   "material_id": 4,
+   "layer_id": "14",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-PCABS_14_Normal.json",
+   "material": "Z-PCABS",
+   "material_id": 4,
+   "layer_id": "14",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-PCABS_19_High.json",
+   "material": "Z-PCABS",
+   "material_id": 4,
+   "layer_id": "19",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-PCABS_19_Normal.json",
+   "material": "Z-PCABS",
+   "material_id": 4,
+   "layer_id": "19",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-PCABS_29_High.json",
+   "material": "Z-PCABS",
+   "material_id": 4,
+   "layer_id": "29",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-PCABS_29_Normal.json",
+   "material": "Z-PCABS",
+   "material_id": 4,
+   "layer_id": "29",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-PETG_14_High.json",
+   "material": "Z-PETG",
+   "material_id": 5,
+   "layer_id": "14",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-PETG_14_Normal.json",
+   "material": "Z-PETG",
+   "material_id": 5,
+   "layer_id": "14",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-PETG_19_High.json",
+   "material": "Z-PETG",
+   "material_id": 5,
+   "layer_id": "19",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-PETG_19_Normal.json",
+   "material": "Z-PETG",
+   "material_id": 5,
+   "layer_id": "19",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-PETG_19_Draft.json",
+   "material": "Z-PETG",
+   "material_id": 5,
+   "layer_id": "19",
+   "quality": "Draft",
+   "quality_id": 3,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-PLA_Pro_9_High.json",
+   "material": "Z-PLA Pro",
+   "material_id": 11,
+   "layer_id": "9",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-PLA_Pro_9_Normal.json",
+   "material": "Z-PLA Pro",
+   "material_id": 11,
+   "layer_id": "9",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-PLA_Pro_14_High.json",
+   "material": "Z-PLA Pro",
+   "material_id": 11,
+   "layer_id": "14",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-PLA_Pro_14_Normal.json",
+   "material": "Z-PLA Pro",
+   "material_id": 11,
+   "layer_id": "14",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-PLA_Pro_19_High.json",
+   "material": "Z-PLA Pro",
+   "material_id": 11,
+   "layer_id": "19",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-PLA_Pro_19_Normal.json",
+   "material": "Z-PLA Pro",
+   "material_id": 11,
+   "layer_id": "19",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-PLA_Pro_19_Draft.json",
+   "material": "Z-PLA Pro",
+   "material_id": 11,
+   "layer_id": "19",
+   "quality": "Draft",
+   "quality_id": 3,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-PLA_Pro_29_High.json",
+   "material": "Z-PLA Pro",
+   "material_id": 11,
+   "layer_id": "29",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-PLA_Pro_29_Normal.json",
+   "material": "Z-PLA Pro",
+   "material_id": 11,
+   "layer_id": "29",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ULTRAT_9_High.json",
+   "material": "Z-ULTRAT",
+   "material_id": 1,
+   "layer_id": "9",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ULTRAT_9_Normal.json",
+   "material": "Z-ULTRAT",
+   "material_id": 1,
+   "layer_id": "9",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ULTRAT_14_High.json",
+   "material": "Z-ULTRAT",
+   "material_id": 1,
+   "layer_id": "14",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ULTRAT_14_Normal.json",
+   "material": "Z-ULTRAT",
+   "material_id": 1,
+   "layer_id": "14",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ULTRAT_19_High.json",
+   "material": "Z-ULTRAT",
+   "material_id": 1,
+   "layer_id": "19",
+   "quality": "High",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ULTRAT_19_Normal.json",
+   "material": "Z-ULTRAT",
+   "material_id": 1,
+   "layer_id": "19",
+   "quality": "Normal",
+   "quality_id": 2,
+   "infill_id": 1,
+   "nozzle_id": 0
+  },
+  {
+   "file": "Z-ULTRAT_29_Normal.json",
+   "material": "Z-ULTRAT",
+   "material_id": 1,
+   "layer_id": "29",
+   "quality": "Normal",
+   "quality_id": 1,
+   "infill_id": 1,
+   "nozzle_id": 0
+  }
+ ]
+}

@@ -1,8 +1,8 @@
 {
     "name": "Zortrax M-series",
     "author": "Fiach",
-    "version": "0.2.5",
-    "description": "Zortrax M200 Plus and M300 Plus support: printer and Zortrax filament profiles ported from Z-Suite, .zcodex2 output, and LAN printing with status and camera.",
+    "version": "0.3.0",
+    "description": "Zortrax M200 Plus, M300 Plus and original M200 support: printer and Zortrax filament profiles ported from Z-Suite, .zcodex2 and .zcode output, and LAN printing with status and camera.",
     "api": 8,
     "supported_sdk_versions": ["8.0.0", "8.1.0", "8.2.0", "8.3.0", "8.4.0", "8.5.0", "8.6.0", "8.7.0", "8.8.0", "8.9.0", "8.10.0", "8.11.0", "8.12.0", "8.13.0"],
     "i18n-catalog": "cura"

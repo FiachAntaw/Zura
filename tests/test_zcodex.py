@@ -99,5 +99,48 @@ class PauseTests(unittest.TestCase):
         self.assertEqual(r.pauses, [{"Time": 12, "Material": None, "LayerNumber": 1}])
 
 
+
+
+class ClassicZCodeTests(unittest.TestCase):
+    """Original M200 .zcode (Z-Suite 2.32 classic)."""
+
+    def test_compiler_matches_zsuite_232(self):
+        # zsuite232-classic-cube20.zcode was written by Z-Suite 2.32's own BinaryZCodeFile from the same text.
+        from zcodex import classic
+        lines = _read("zsuite232-classic-cube20.gcode", "r").splitlines()
+        self.assertEqual(classic.build(lines, classic.Header()), _read("zsuite232-classic-cube20.zcode"))
+
+    def test_cura_slice_translates(self):
+        from zcodex import classic, classic_gcode
+        lines = _read("cura514-e2e-m200-cube20.gcode", "r").splitlines()
+        data = classic_gcode.build(lines, material="Z-PLA Pro", layer_id="19", quality="High")
+        fields, cmds = classic.read(data)
+        n = fields["command_count"]
+        self.assertEqual((fields["printing_profile"], fields["layer_thickness"], fields["quality"]), (11, 19, 1))
+        self.assertEqual(fields["min_fw"], (1, 1, 1))
+        self.assertEqual(fields["raft_layers"], 6)  # Z-PLA Pro: base + 3 interface + 3 surface, less the base
+        self.assertEqual(fields["print_time"], int(lines[1].split(":")[1]))
+        self.assertTrue(all(op == C.Op.CUSTOM_DATA for op, _ in cmds[n:]))
+        body = cmds[:n]
+        self.assertEqual(body[0], (C.Op.REPORT_PROGRESS, b"\x00"))
+        self.assertEqual(body[-1], (C.Op.REPORT_PROGRESS, b"\x64"))
+        layers = [struct.unpack("<i", a)[0] for op, a in body if op == C.Op.LAYER]
+        self.assertEqual(layers, list(range(-7, len(layers) - 7)))
+        progress = [a[0] for op, a in body if op == C.Op.REPORT_PROGRESS]
+        self.assertEqual(progress, sorted(progress))
+        moves = [C.decode_axes(a[1:]) for op, a in body if op == C.Op.PRINT_MOVE]
+        self.assertLess(max(abs(m.get("E", 0)) for m in moves), 960 * 1000)  # E is reset every layer
+        self.assertTrue(all(("Z" in m) == ("Z2" in m) for m in moves))
+        temps = [a for op, a in body if op == C.Op.SET_EXTRUDER_TEMPERATURE]
+        self.assertEqual(struct.unpack("<Bi", temps[0]), (0, 207))
+
+    def test_fan_commands_move_15_moves_later(self):
+        from zcodex.classic_gcode import move_fan_commands
+        fan = C.print_move(255, fan2=255)
+        moves = [C.print_move(252, x=i) for i in range(20)]
+        out = move_fan_commands([fan] + moves)
+        self.assertEqual(out.index(fan), 15)
+
+
 if __name__ == "__main__":
     unittest.main()
