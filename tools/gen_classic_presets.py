@@ -153,6 +153,15 @@ def classic_values(cfg: dict) -> dict:
     v["wall_0_material_flow"] = round(100 * cfg["SL_ContourFeed"] / nominal)
     v["wall_x_material_flow"] = round(100 * cfg["IV_ContourFeed"] / nominal)
     v["infill_line_width"] = round(0.4 * cfg["IV_InfillFeed"] / nominal, 2)
+    # Z-Suite prints the first model layer on the raft deliberately starved (FL_*Feed, with
+    # FL_InfillIncrement line spacing) so it bonds only lightly and the raft peels off.
+    # Cura would otherwise lay a full-flow first layer straight onto the raft.
+    fl_fill = (cfg["FL_InfillFeed"] / cfg["FL_InfillIncrement"]) / (nominal / 0.4)
+    v["material_flow_layer_0"] = round(100 * fl_fill)
+    v["skin_material_flow_layer_0"] = round(100 * fl_fill)
+    # Cura multiplies these by the walls' normal flow, so they are relative to SL_/IV_ContourFeed.
+    v["wall_0_material_flow_layer_0"] = round(100 * cfg["FL_ContourFeed"] / cfg["SL_ContourFeed"])
+    v["wall_x_material_flow_layer_0"] = round(100 * cfg["FL_ContourFeed"] / cfg["IV_ContourFeed"])
     return v
 
 
