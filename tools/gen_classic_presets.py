@@ -113,6 +113,9 @@ def classic_values(cfg: dict) -> dict:
         "raft_interface_thickness": cfg["RB_RaftDefaultHeight"],
         "raft_surface_thickness": cfg["RB_RaftDefaultHeight"],
         "raft_base_thickness": cfg["RB_Height"],
+        # Z-Suite lays the base layer very heavy (RB_Feed, filament mm per mm) so it squashes into the
+        # perforated plate; Cura's default 0.8 mm base line at RB_Height carries far less.
+        "raft_base_flow": round(100 * cfg["RB_Feed"] / (0.8 * cfg["RB_Height"] / G.FILAMENT_AREA)),
         "raft_base_speed": G.mms(cfg["RB_Speed"]),
         "raft_interface_speed": G.mms(cfg["RG_Speed"]),
         "raft_surface_speed": G.mms(cfg["RS_Speed"]),

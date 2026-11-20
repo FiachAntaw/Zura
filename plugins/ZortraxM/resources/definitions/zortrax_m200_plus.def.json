@@ -30,6 +30,7 @@
             "adhesion_type",
             "bridge_settings_enabled",
             "cool_fan_enabled",
+            "cool_fan_full_layer",
             "infill_pattern",
             "infill_sparse_density",
             "material_final_print_temperature",
@@ -142,6 +143,9 @@
         },
         "cool_fan_enabled": {
             "value": true
+        },
+        "cool_fan_full_layer": {
+            "value": 2
         },
         "infill_pattern": {
             "value": "'grid'"

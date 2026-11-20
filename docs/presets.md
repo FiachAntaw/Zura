@@ -29,10 +29,12 @@ Cura resolves them in the order material quality > material > global quality > d
 | speed_travel | R_IdleMoveSpeed |
 | retraction_amount, retraction_speed, retraction_prime_speed, retract_at_layer_change | RetractionDistance, R_BackSpeed, R_ForwardSpeed, R_ForceRetractionOnLayerChange |
 | speed_layer_0, speed_print_layer_0 | FLNR_ContourSpeed, FLNR_InfillSpeed |
-| cool_fan_speed_min / max, cool_min_layer_time(_fan_speed_max), cool_fan_speed_0 | Autofan* (Z-Suite ramps fan by layer time), Raft_FanSpeed |
+| cool_fan_speed_min / max, cool_min_layer_time(_fan_speed_max) | Autofan* (Z-Suite ramps fan by layer time) |
 | adhesion_type = raft, raft_* speeds/layers/spacing, raft_base_thickness, raft_margin, raft_surface_margin | RB_/RG_/RS_/R2_ fields, RB_Height (= RaftPlatformGap), RB_RG_Enlarge, RS_Enlarge |
 | raft_airgap, layer_0_z_overlap | FL_ModelSpace, FL_SecondLayerLower |
+| cool_fan_speed_0 (formula: FL_FanSpeed on a raft, else 0), raft_fan_speed, cool_fan_full_layer = 2 | FL_FanSpeed, Raft_FanSpeed (Z-Suite cools the first model layer on the raft hard so the raft peels off) |
 | raft_interface_thickness, raft_surface_thickness | RB_RaftDefaultHeight |
+| raft_base_flow | RB_Feed / (0.8 mm line x RB_Height): Z-Suite's base layer is laid heavy enough to squash into the perforated plate |
 | wall_0_material_flow, wall_x_material_flow | SL_ContourFeed, SL_InnerContourFeed ÷ (0.4 × layer ÷ filament area) |
 | infill_line_width | 0.4 × IV_InfillFeed ÷ nominal (thick, sparse infill like Z-Suite) |
 | retraction_hop_enabled, retraction_hop, retraction_min_travel | R_LiftZEnable, R_LiftZHeight, R_MinLength |

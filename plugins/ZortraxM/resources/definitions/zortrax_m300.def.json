@@ -41,11 +41,11 @@
             "bridge_settings_enabled",
             "cool_fan_enabled",
             "cool_fan_full_layer",
+            "cool_fan_speed_0",
             "infill_pattern",
             "infill_sparse_density",
             "material_final_print_temperature",
             "material_initial_print_temperature",
-            "raft_fan_speed",
             "raft_interface_line_spacing",
             "raft_interface_thickness",
             "raft_surface_thickness",
@@ -153,14 +153,14 @@
         "cool_fan_full_layer": {
             "value": 4
         },
+        "cool_fan_speed_0": {
+            "value": 20
+        },
         "infill_pattern": {
             "value": "'grid'"
         },
         "infill_sparse_density": {
             "value": 20
-        },
-        "raft_fan_speed": {
-            "value": 30
         },
         "raft_interface_line_spacing": {
             "value": 1.0

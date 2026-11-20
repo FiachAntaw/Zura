@@ -95,7 +95,13 @@ def cura_values(cfg: dict, ui: dict, layer_mm: float) -> dict:
         "cool_fan_speed_max": cfg.get("AutofanMinTimeSpeed") or 100,
         "cool_min_layer_time_fan_speed_max": cfg.get("AutofanMaxTime", 20.0),
         "cool_min_layer_time": cfg.get("AutofanMinTime", 10.0),
-        "cool_fan_speed_0": cfg.get("Raft_FanSpeed") or 0,
+        # Z-Suite runs the raft at Raft_FanSpeed and the first model layer on the raft at
+        # FL_FanSpeed (100% for nearly every filament), which chills it so the raft peels off.
+        # Without a raft the first layer stays unfanned. Written as a formula in the
+        # material-specific quality profiles (see main()).
+        "raft_fan_speed": cfg.get("Raft_FanSpeed") or 0,
+        "cool_fan_full_layer": 2,
+        "cool_fan_speed_0": f"=({int(cfg.get('FL_FanSpeed', 100))} if adhesion_type == 'raft' else 0)",
         # raft (Z-Suite default adhesion)
         "adhesion_type": "raft" if ui.get("RaftEnabled", True) else "none",
         # Z-Suite prints the first model layer FL_ModelSpace above the raft top (+ one layer) and the
@@ -114,6 +120,9 @@ def cura_values(cfg: dict, ui: dict, layer_mm: float) -> dict:
         "raft_interface_line_spacing": cfg["RG_Increment"],
         "raft_base_line_spacing": cfg["RB_Increment"],
         "raft_base_thickness": cfg["RB_Height"],
+        # Z-Suite lays the base layer very heavy (RB_Feed, filament mm per mm) so it squashes into the
+        # perforated plate; Cura's default 0.8 mm base line at RB_Height carries far less.
+        "raft_base_flow": round(100 * cfg["RB_Feed"] / (0.8 * cfg["RB_Height"] / FILAMENT_AREA)),
         "raft_margin": cfg.get("RB_RG_Enlarge", 3),
         "raft_surface_margin": cfg.get("RS_Enlarge", 5.0),
         # support
@@ -317,7 +326,10 @@ def main():
                 vals.pop(k, None)
         vals["default_material_print_temperature"] = vals.pop("material_print_temperature")
         vals["default_material_bed_temperature"] = vals.pop("material_bed_temperature")
+    fl_fan = {c: vals.pop("cool_fan_speed_0") for c, vals in table.items()}  # formulas: quality profiles only
     homes, definition, materials, globals_, exceptions = plan(table)
+    for c, v in fl_fan.items():
+        exceptions[c]["cool_fan_speed_0"] = v
     write_definition(definition)
     for mid, name in names.items():
         with open(os.path.join(mat_dir, f"{mid}.xml.fdm_material"), "w") as f:

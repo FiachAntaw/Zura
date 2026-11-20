@@ -23,15 +23,16 @@
         <setting key="print temperature">290</setting>
         <setting key="retraction amount">1.2</setting>
         <setting key="retraction speed">36.7</setting>
-        <cura:setting key="cool_fan_speed_0">0</cura:setting>
         <cura:setting key="cool_fan_speed_max">100</cura:setting>
         <cura:setting key="cool_fan_speed_min">20</cura:setting>
         <cura:setting key="cool_min_layer_time">15.0</cura:setting>
         <cura:setting key="cool_min_layer_time_fan_speed_max">30.0</cura:setting>
         <cura:setting key="inset_direction">outside_in</cura:setting>
         <cura:setting key="raft_airgap">0.1</cura:setting>
+        <cura:setting key="raft_base_flow">225</cura:setting>
         <cura:setting key="raft_base_line_spacing">3.0</cura:setting>
         <cura:setting key="raft_base_thickness">0.4</cura:setting>
+        <cura:setting key="raft_fan_speed">0</cura:setting>
         <cura:setting key="retraction_hop">0.2</cura:setting>
         <cura:setting key="speed_print_layer_0">30.0</cura:setting>
         <cura:setting key="speed_travel">200.0</cura:setting>
