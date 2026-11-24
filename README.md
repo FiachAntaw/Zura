@@ -14,7 +14,6 @@ Cura plugin for the Zortrax M200 Plus, M300 Plus and the original M200 and M300.
 
 ## Not yet
 - Real-hardware check of Cura's Print over network button and Monitor tab (the same client code started the first real print from a script).
-- Live progress: firmware 2.6.15 answered printStatus with status 2 for a whole print, so the Monitor tab estimates progress from the slicer's print time for prints it started.
 - M300 Plus on real hardware (header model id 50 and firmware 2.6.0 are from Z-Suite but untested).
 - M300 Dual (dual extrusion).
 

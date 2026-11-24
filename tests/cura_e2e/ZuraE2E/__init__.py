@@ -339,8 +339,25 @@ class E2E(Extension):
         dev = app.getOutputDeviceManager().getOutputDevice("zortrax-127.0.0.1")
         names = [f["name"] for f in dev.printerFiles]
         log(f"after delete: {len(names)} files, deleted still listed={getattr(self, '_deleted', None) in names}")
-        log("done")
-        QTimer.singleShot(500, app.closeApplication)
+        dev.sendControl("resume")  # the fake printer completes at 99%
+        self._polls = 0
+        QTimer.singleShot(3000, self.step_net5)
+
+    @guard
+    def step_net5(self):
+        app = CuraApplication.getInstance()
+        dev = app.getOutputDeviceManager().getOutputDevice("zortrax-127.0.0.1")
+        p, st = dev.activePrinter, dict(dev.zortraxStatus)
+        pj = p.activePrintJob
+        log(f"job: printer={p.state} status={st.get('printerStatus')} name={pj.name if pj else None} "
+            f"jobstate={pj.state if pj else None} progress={st.get('job_progress')} file={st.get('job_filename')} "
+            f"elapsed={pj.timeElapsed if pj else None}/{pj.timeTotal if pj else None}")
+        self._polls += 1
+        if st.get("printerStatus") == "printing_complete" or self._polls > 40:
+            log("done")
+            QTimer.singleShot(500, app.closeApplication)
+            return
+        QTimer.singleShot(3000, self.step_net5)
 
 def getMetaData():
     return {}

@@ -328,6 +328,30 @@ def fields(response: dict) -> dict:
     return {i.get("name"): i.get("value") for i in items if isinstance(i, dict)}
 
 
+def print_metadata(job: dict) -> dict:
+    """The running file's AdditionalMetadata from a printStatus reply (PrintTime, TotalLayersCount, ...).
+
+    The M200 Plus (firmware 2.6.15) sends it base64-encoded and wrapped every 76 characters, which is
+    what Z-Suite decodes (Convert.FromBase64String). Plain JSON is accepted too.
+    """
+    meta = job.get("metadata")
+    if isinstance(meta, dict):
+        return meta
+    if not isinstance(meta, str) or not meta.strip():
+        return {}
+    text = meta.strip()
+    if not text.startswith("{"):
+        try:
+            text = base64.b64decode("".join(text.split()), validate=True).decode("utf-8")
+        except (binascii.Error, ValueError, UnicodeDecodeError):
+            return {}
+    try:
+        value = json.loads(text)
+    except ValueError:
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
 def upload_bytes(client: "PrinterClient", data: bytes, path: str, callback=None) -> dict:
     """Upload in-memory bytes (refuses to overwrite), calling callback(sent, total)."""
     path = remote_path(path)

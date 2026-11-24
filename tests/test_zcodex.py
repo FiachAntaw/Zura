@@ -153,5 +153,19 @@ class ClassicZCodeTests(unittest.TestCase):
         self.assertEqual(out.index(fan), 15)
 
 
+class PrintStatusTests(unittest.TestCase):
+    def test_metadata_is_wrapped_base64(self):
+        import base64, json
+        from lan import client as lan
+        # As the M200 Plus (firmware 2.6.15) sent it during a print, wrapped every 76 characters.
+        meta = {"PrinterName": "M200 Plus", "TotalLayersCount": 107, "PrintTime": 1907, "LayerThickness": 0.2}
+        wrapped = base64.encodebytes(json.dumps(meta).encode()).decode()
+        self.assertIn("\n", wrapped)
+        self.assertEqual(lan.print_metadata({"metadata": wrapped})["PrintTime"], 1907)
+        self.assertEqual(lan.print_metadata({"metadata": json.dumps(meta)})["TotalLayersCount"], 107)
+        self.assertEqual(lan.print_metadata({"metadata": "not base64!"}), {})
+        self.assertEqual(lan.print_metadata({}), {})
+
+
 if __name__ == "__main__":
     unittest.main()

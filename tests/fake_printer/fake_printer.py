@@ -27,14 +27,16 @@ def handle(storage, cmd):
         f = {"hotendTemperature": 245 if STATE["printerStatus"] == "printing" else 30, "heatbedTemperature": 80,
              "printerStatus": STATE["printerStatus"], "storageBytesFree": 3843940352, "storageBytesTotal": 4019163136,
              "currentMaterial": "Z-ABS", "serialNumber": "FAKE0001", "currentMaterialId": 0,
-             "printingInProgress": 1 if STATE["printerStatus"] == "printing" else 0}
+             "printingInProgress": 1 if STATE["printerStatus"] in ("printing", "printing_paused", "printing_complete") else 0}
         ok["fields"] = [{"name": k, "value": f.get(k, 0)} for k in cmd.get("fields", [])]
     elif t == "printStatus":
-        if STATE["printerStatus"] == "idling" or os.environ.get("FAKE_NO_PRINTSTATUS"):
-            return {"type": t, "status": "2"}  # firmware 2.6.15 also did this during a whole print  # what the real M200 Plus (firmware 2.6.15) answers when idle
+        if STATE["printerStatus"] not in ("printing", "printing_paused") or os.environ.get("FAKE_NO_PRINTSTATUS"):
+            return {"type": t, "status": "2"}  # the real M200 Plus (firmware 2.6.15) when idle, preparing or heating
         if STATE["printerStatus"] == "printing":
-            STATE["progress"] = min(100, STATE["progress"] + 5)
-        f = {"progress": STATE["progress"], "filename": STATE["filename"], "metadata": json.dumps({"PrintTime": 1800}), "userSettings": ""}
+            STATE["progress"] = min(99, STATE["progress"] + 5)  # the real printer's last answer was 99
+            if STATE["progress"] == 99:
+                STATE["printerStatus"] = "printing_complete"  # stays until the part is taken off
+        f = {"progress": STATE["progress"], "filename": STATE["filename"], "metadata": base64.encodebytes(json.dumps({"PrintTime": 1800, "TotalLayersCount": 107}).encode()).decode(), "userSettings": ""}
         ok["fields"] = [{"name": k, "value": f.get(k)} for k in cmd.get("fields", [])]
     elif t == "version":
         f = {"protocol": 1, "firmware": "2.6.15", "software": 23727, "hardware": 24}  # types as the real printer

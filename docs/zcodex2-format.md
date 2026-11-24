@@ -68,8 +68,12 @@ Start sequence Z-Suite emits (M200 Plus): `SetAsValue E0, SetBedTemperature, Set
 
 - `printFromStorage` takes the **bare file name** (`"benchy.zcodex2"`), as Z-Suite sends `Path.GetFileName(file)`. With a leading `/` the printer answers `{"status":"3","startPrintAdditionalInfo":1}` ("corrupted file") even for Z-Suite's own files.
 - `wakeUp` closes the connection without a reply; Z-Suite only sends it when `printerStatus` is `sleeping`.
-- `printStatus` answers `{"status":"2"}` while idle, and on this printer also throughout a print. Z-Suite asks for it in its own request, only while printing.
-- `printerStatus` values seen: `idling`, `preparing_for_print`, `heating`, `busy` (homing/calibration), `printing`, `failsafe` (this printer reports failsafe 55/5/5 at the end of every print, a known quirk).
+- `printStatus` answers `{"status":"2"}` unless `printerStatus` is `printing` (so also while preparing, heating, busy, and for the last seconds of a print). Z-Suite asks for it in its own request, only while printing. Its fields:
+  - `progress`: whole percent. On a 107-layer cube it sat at 0 for the first ~4 minutes (raft), then climbed to 99; 100 was never reported.
+  - `filename`: the bare name, no leading `/`.
+  - `metadata`: the file's AdditionalMetadata JSON, base64-encoded with a line break every 76 characters (`PrintTime`, `TotalLayersCount`, `Materials`, ...).
+  - `userSettings`: an empty string.
+- `printerStatus` values seen: `idling`, `initializing`, `preparing_for_print`, `heating`, `busy` (homing/calibration, and briefly at the end of a print), `printing`, `printing_complete` (after a print until the part is removed; `printingInProgress` stays 1; not in Z-Suite 3.7's enum), `failsafe` (failsafe 55/5/5 has appeared at the end of some prints; not on the Z-ULTRAT cube of 2026-11-24).
 - `version` replies with typed values: `protocol` 1, `firmware` "2.6.15", `software` 23727, `hardware` 24.
 - FTP `MLSD` works; sizes are strings and `modify` is `YYYYMMDDHHMMSS.mmm`.
 

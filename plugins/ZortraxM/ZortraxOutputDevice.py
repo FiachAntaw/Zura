@@ -33,9 +33,11 @@ catalog = i18nCatalog("cura")
 PRINTER_STATE = {"idling": "idle", "sleeping": "idle", "uninitialized": "idle", "initializing": "pre_print",
                  "printing": "printing", "printing_paused": "paused", "busy": "pre_print",
                  "preparing_for_print": "pre_print", "heating": "pre_print", "failsafe": "error",
-                 "unresponsive": "error", "blackout": "error", "waiting_for_material_setup": "maintenance"}
+                 "unresponsive": "error", "blackout": "error", "waiting_for_material_setup": "maintenance",
+                 "printing_complete": "idle"}
+# "printing_complete" (firmware 2.6.15, not in Z-Suite 3.7's enum) lasts until the part is taken off.
 JOB_STATE = {"printing": "printing", "printing_paused": "paused", "busy": "pre_print",
-             "preparing_for_print": "pre_print", "heating": "pre_print"}
+             "preparing_for_print": "pre_print", "heating": "pre_print", "printing_complete": "wait_cleanup"}
 
 
 class ZortraxController(PrinterOutputController):
@@ -77,6 +79,7 @@ class ZortraxOutputDevice(PrinterOutputDevice):
         self._last_error = ""
         self._uploading = False
         self._last_sent = None  # {"name", "print_time", "started"} of the file this device last started
+        self._job_memo: dict = {}  # last printStatus fields of the running job (it answers only while printing)
         self._loaded_material = ""
         self._files: list = []
         self._files_loading = False
@@ -159,31 +162,42 @@ class ZortraxOutputDevice(PrinterOutputDevice):
             pass
         in_progress = str(status.get("printingInProgress", "0")) not in ("0", "False", "false", "")
         if in_progress or state in JOB_STATE:
-            name = str(job.get("filename") or "print")
+            # printStatus answers status 2 (no data) while preparing, heating and busy, and again in the
+            # last seconds of a print, so keep the job's last known name, progress and time between answers.
+            if job.get("filename"):
+                if job.get("filename") != self._job_memo.get("filename"):
+                    self._job_memo = {}
+                self._job_memo.update({k: v for k, v in job.items() if v not in (None, "")})
+            elif self._last_sent and not self._job_memo:
+                self._job_memo = {"filename": self._last_sent["name"]}
+            memo = self._job_memo
+            name = str(memo.get("filename") or "print")
             pj = printer.activePrintJob
             if pj is None or pj.name != name:
                 pj = PrintJobOutputModel(output_controller=printer.getController(), key=name, name=name)
                 printer.updateActivePrintJob(pj)
             pj.updateState(JOB_STATE.get(state, "printing"))
-            progress = self._progress(job)
-            total = self._estimated_seconds(job)
+            progress = 100.0 if state == "printing_complete" else self._progress(memo)
+            total = self._estimated_seconds(memo)
             sent = self._last_sent
             if progress is None and sent and name in ("print", sent["name"]) and sent["print_time"]:
-                # The printer doesn't always answer printStatus; estimate from the slicer's time instead.
+                # Before the printer's first progress answer, estimate from the slicer's time.
                 if state == "printing" and sent["started"] is None:
                     sent["started"] = time.time()
                 if sent["started"] is not None:
-                    total = sent["print_time"]
+                    total = total or sent["print_time"]
                     progress = min(99.0, (time.time() - sent["started"]) * 100.0 / total)
-                    self._status["job_progress"] = round(progress, 1)
                     self._status["job_estimated"] = True
-                if name == "print":
-                    self._status["job_filename"] = sent["name"]
+            if progress is not None:
+                self._status["job_progress"] = round(progress, 1)
+            if name != "print":
+                self._status["job_filename"] = name
             if progress is not None and total:
                 pj.updateTimeTotal(total)
                 pj.updateTimeElapsed(int(total * progress / 100))
         else:
             printer.updateActivePrintJob(None)
+            self._job_memo = {}
             if self._last_sent and self._last_sent["started"] is not None:
                 self._last_sent = None  # that print has ended
         if camera:
@@ -222,18 +236,10 @@ class ZortraxOutputDevice(PrinterOutputDevice):
 
     @staticmethod
     def _estimated_seconds(job: dict) -> int:
-        meta = job.get("metadata")
-        if isinstance(meta, str):
-            try:
-                meta = json.loads(meta)
-            except ValueError:
-                meta = {}
-        if isinstance(meta, dict):
-            try:
-                return int(meta.get("PrintTime") or 0)
-            except (TypeError, ValueError):
-                return 0
-        return 0
+        try:
+            return int(lan.print_metadata(job).get("PrintTime") or 0)
+        except (TypeError, ValueError):
+            return 0
 
     # ------------------------------------------------------------------ QML properties
     @pyqtProperty(str, notify=cameraChanged)
