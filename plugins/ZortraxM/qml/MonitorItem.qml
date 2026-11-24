@@ -32,13 +32,14 @@ Component
                 case "printing": return catalog.i18nc("@label:status", "Printing")
                 case "heating": return catalog.i18nc("@label:status", "Heating")
                 case "busy": case "preparing_for_print": case "initializing": return catalog.i18nc("@label:status", "Preparing")
+                case "printing_complete": return catalog.i18nc("@label:status", "Finished, remove the print")
                 case "paused": case "printing_paused": return catalog.i18nc("@label:status", "Paused")
                 case "waiting_for_material_setup": return catalog.i18nc("@label:status", "Waiting for material")
                 case "idle": case "idling": return catalog.i18nc("@label:status", "Idle")
                 case "sleep": case "sleeping": return catalog.i18nc("@label:status", "Sleeping")
                 case "failsafe": return catalog.i18nc("@label:status", "Needs attention")
                 case "": return catalog.i18nc("@label:status", "Connecting…")
-                default: return s.charAt(0).toUpperCase() + s.slice(1)
+                default: s = s.replace(/_/g, " "); return s.charAt(0).toUpperCase() + s.slice(1)
             }
         }
 

@@ -16,11 +16,10 @@ Cura plugin for the Zortrax M200 Plus, M300 Plus and the original M200 and M300.
 - **Output**: native `.zcodex2` writer. Cura's G-code is translated into Zortrax's binary command stream, with Z-Suite's start/end sequence, feature tags, progress reports and an encrypted `ConfigurationData` entry. See `docs/zcodex2-format.md`.
 - **LAN printing**: printers on the network appear in Cura's Add printer screen (or add by IP), send & print over FTP, Monitor tab with camera snapshot, temperatures, progress, pause/resume/abort, loaded-filament sync with a mismatch warning, and a list of files on the printer (print or delete).
 - **Pause at height**: Cura's Pause at height script becomes a native Zortrax pause.
-- **Verified on a real M200 Plus** (firmware 2.6.15): a Cura-sliced 3DBenchy in Z-ULTRAT printed start to finish from a Zura .zcodex2.
+- **Verified on a real M200 Plus** (firmware 2.6.15): a Cura-sliced 3DBenchy in Z-ULTRAT printed start to finish from a Zura .zcodex2. Cura's Print over network button and the Monitor tab (camera, live progress through to a finished print, file list) work on it too.
 - Verified headless in Cura 5.14: add printer, slice, save `.zcodex2` (parses cleanly with Z-Suite's own command classes), and the whole network flow against `tests/fake_printer`.
 
 ## Not yet
-- Real-hardware check of Cura's Print over network button and Monitor tab (the same client code started the first real print from a script).
 - M300 Plus on real hardware (header model id 50 and firmware 2.6.0 are from Z-Suite but untested).
 - M300 Dual (dual extrusion).
 
