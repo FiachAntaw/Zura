@@ -8,7 +8,7 @@ from io import StringIO
 from typing import Optional
 
 from PyQt6.QtCore import QObject, QUrl, pyqtProperty, pyqtSignal, pyqtSlot
-from PyQt6.QtGui import QImage
+from PyQt6.QtGui import QImage, QTransform
 
 from UM.Logger import Logger
 from UM.Message import Message
@@ -201,7 +201,9 @@ class ZortraxOutputDevice(PrinterOutputDevice):
             if self._last_sent and self._last_sent["started"] is not None:
                 self._last_sent = None  # that print has ended
         if camera:
-            image = QImage.fromData(base64.b64decode(camera["data"]))
+            # The M200 Plus, M300 Plus and M300 Dual cameras are mounted upside down; Z-Suite turns the
+            # snapshot 180 degrees for all three (IsViewUpsideDown), so do the same.
+            image = QImage.fromData(base64.b64decode(camera["data"])).transformed(QTransform().rotate(180))
             if not image.isNull():
                 ZortraxCameraProvider.instance().setImage(self._host, image)
                 self._camera_counter += 1
