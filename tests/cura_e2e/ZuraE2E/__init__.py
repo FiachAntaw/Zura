@@ -274,7 +274,22 @@ class E2E(Extension):
     def step_shots(self):
         app = CuraApplication.getInstance()
         app.getController().setActiveStage("MonitorStage")
-        QTimer.singleShot(5000, self.step_shot_monitor)
+        self._waits = 0
+        QTimer.singleShot(2000, self.step_shot_wait)
+
+    @guard
+    def step_shot_wait(self):
+        # Wait until the fake printer is part-way through the job so the shot shows live progress.
+        st = dict(CuraApplication.getInstance().getOutputDeviceManager().getOutputDevice("zortrax-127.0.0.1").zortraxStatus)
+        self._waits += 1
+        try:
+            progress = float(st.get("job_progress") or 0)
+        except ValueError:
+            progress = 0
+        if progress >= float(os.environ.get("ZURA_E2E_SHOT_PROGRESS", "0")) or self._waits > 60:
+            QTimer.singleShot(500, self.step_shot_monitor)
+            return
+        QTimer.singleShot(1000, self.step_shot_wait)
 
     @guard
     def step_shot_monitor(self):

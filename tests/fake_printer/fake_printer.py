@@ -26,7 +26,7 @@ def handle(storage, cmd):
     if t == "status":
         f = {"hotendTemperature": 245 if STATE["printerStatus"] == "printing" else 30, "heatbedTemperature": 80,
              "printerStatus": STATE["printerStatus"], "storageBytesFree": 3843940352, "storageBytesTotal": 4019163136,
-             "currentMaterial": "Z-ABS", "serialNumber": "FAKE0001", "currentMaterialId": 0,
+             "currentMaterial": os.environ.get("FAKE_MATERIAL", "Z-ABS"), "serialNumber": "FAKE0001", "currentMaterialId": 0,
              "printingInProgress": 1 if STATE["printerStatus"] in ("printing", "printing_paused", "printing_complete") else 0}
         ok["fields"] = [{"name": k, "value": f.get(k, 0)} for k in cmd.get("fields", [])]
     elif t == "printStatus":
