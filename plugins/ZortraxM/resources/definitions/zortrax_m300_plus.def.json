@@ -6,6 +6,7 @@
         "visible": true,
         "author": "Zura",
         "manufacturer": "Zortrax",
+        "supports_usb_connection": false,
         "file_formats": "application/x-zortrax-zcodex2",
         "platform": "zortrax_m300_plus_platform.stl",
         "platform_offset": [0, 0, 0],

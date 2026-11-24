@@ -6,6 +6,7 @@
         "visible": true,
         "author": "Zura",
         "manufacturer": "Zortrax",
+        "supports_usb_connection": false,
         "file_formats": "application/x-zortrax-zcode",
         "platform_offset": [
             0,
