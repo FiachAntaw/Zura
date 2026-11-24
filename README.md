@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/zura-logo-dark.svg">
+    <img src="docs/images/zura-logo.svg" alt="Zura" width="320">
+  </picture>
+</p>
+
 # Zura: Zortrax M-series support for Cura
 
 Cura plugin for the Zortrax M200 Plus, M300 Plus and the original M200 and M300. Targets Cura 5.14 (SDK 8.13).
